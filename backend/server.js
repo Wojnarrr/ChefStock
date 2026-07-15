@@ -5,6 +5,8 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const supplierRoutes = require("./routes/suppliers");
 const stockItemRoutes = require("./routes/stockItems");
+const deliveryRoutes = require("./routes/deliveries");
+const inventoryMovementRoutes = require("./routes/inventoryMovements");
 dotenv.config();
 
 const app = express();
@@ -13,6 +15,8 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/stock-items", stockItemRoutes);
+app.use("/api/deliveries", deliveryRoutes);
+app.use("/api/inventory-movements", inventoryMovementRoutes);
 
 app.get("/", (req, res) => {
     res.send("ChefStock API is running");
