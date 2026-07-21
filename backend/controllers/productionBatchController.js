@@ -2,6 +2,7 @@ const ProductionBatch = require("../models/ProductionBatch");
 const Recipe = require("../models/Recipe");
 const StockItem = require("../models/StockItem");
 const InventoryMovement = require("../models/InventoryMovement");
+const mongoose = require("mongoose");
 
 const convertRecipeUsageToStockUnit = require("../utils/convertRecipeUsageToStockUnit");
 const roundStock = require("../utils/roundStock");
@@ -42,10 +43,15 @@ const getProductionBatchById = async (req, res) => {
 };
 
 const createProductionBatch = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
+        session.startTransaction();
+
         const { itemsProduced } = req.body;
 
         if (!itemsProduced || itemsProduced.length === 0) {
+            await session.abortTransaction();
             return res.status(400).json({
                 message: "Production batch must include at least one produced item.",
             });
@@ -55,11 +61,12 @@ const createProductionBatch = async (req, res) => {
         const stockWarnings = [];
 
         for (const producedItem of itemsProduced) {
-            const recipe = await Recipe.findById(producedItem.recipe).populate(
-                "ingredients.stockItem"
-            );
+            const recipe = await Recipe.findById(producedItem.recipe)
+                .populate("ingredients.stockItem")
+                .session(session);
 
             if (!recipe || !recipe.isActive) {
+                await session.abortTransaction();
                 return res.status(404).json({
                     message: "Recipe not found or inactive",
                     recipe: producedItem.recipe,
@@ -70,6 +77,7 @@ const createProductionBatch = async (req, res) => {
                 const stockItem = ingredient.stockItem;
 
                 if (!stockItem || !stockItem.isActive) {
+                    await session.abortTransaction();
                     return res.status(404).json({
                         message: "Recipe contains inactive or missing stock item",
                     });
@@ -78,9 +86,8 @@ const createProductionBatch = async (req, res) => {
                 const recipeUsageQuantity =
                     ingredient.quantity * producedItem.quantityProduced;
 
-                const stockUnitDeduction = convertRecipeUsageToStockUnit(
-                    stockItem,
-                    recipeUsageQuantity
+                const stockUnitDeduction = roundStock(
+                    convertRecipeUsageToStockUnit(stockItem, recipeUsageQuantity)
                 );
 
                 if (stockItem.currentStock < stockUnitDeduction) {
@@ -104,34 +111,48 @@ const createProductionBatch = async (req, res) => {
             }
         }
 
-        const productionBatch = await ProductionBatch.create(req.body);
+        const createdProductionBatches = await ProductionBatch.create(
+            [req.body],
+            { session }
+        );
+
+        const productionBatch = createdProductionBatches[0];
 
         const movementRecords = [];
 
         for (const deduction of deductionsToApply) {
-            const stockItem = await StockItem.findById(deduction.stockItem._id);
+            const stockItem = await StockItem.findById(deduction.stockItem._id).session(
+                session
+            );
 
             const previousStock = stockItem.currentStock;
             const newStock = roundStock(previousStock - deduction.stockUnitDeduction);
 
             stockItem.currentStock = newStock;
-            await stockItem.save();
+            await stockItem.save({ session });
 
-            const movement = await InventoryMovement.create({
-                stockItem: stockItem._id,
-                movementType: "production_usage",
-                quantityChange: roundStock(-deduction.stockUnitDeduction),
-                unit: deduction.stockUnit,
-                previousStock,
-                newStock,
-                sourceType: "ProductionBatch",
-                sourceId: productionBatch._id,
-                performedBy: productionBatch.producedBy || null,
-                notes: `Estimated usage for ${deduction.recipeName}: ${deduction.recipeUsageQuantity}${deduction.recipeUsageUnit}`,
-            });
+            const createdMovements = await InventoryMovement.create(
+                [
+                    {
+                        stockItem: stockItem._id,
+                        movementType: "production_usage",
+                        quantityChange: roundStock(-deduction.stockUnitDeduction),
+                        unit: deduction.stockUnit,
+                        previousStock,
+                        newStock,
+                        sourceType: "ProductionBatch",
+                        sourceId: productionBatch._id,
+                        performedBy: productionBatch.producedBy || null,
+                        notes: `Estimated usage for ${deduction.recipeName}: ${deduction.recipeUsageQuantity}${deduction.recipeUsageUnit}`,
+                    },
+                ],
+                { session }
+            );
 
-            movementRecords.push(movement);
+            movementRecords.push(createdMovements[0]);
         }
+
+        await session.commitTransaction();
 
         const populatedBatch = await ProductionBatch.findById(productionBatch._id)
             .populate("itemsProduced.recipe", "name outputUnit portionsPerOutput");
@@ -142,10 +163,14 @@ const createProductionBatch = async (req, res) => {
             stockWarnings,
         });
     } catch (error) {
+        await session.abortTransaction();
+
         res.status(400).json({
             message: "Failed to create production batch",
             error: error.message,
         });
+    } finally {
+        session.endSession();
     }
 };
 
