@@ -1,12 +1,25 @@
 const StockItem = require("../models/StockItem");
 
+const addStockStatus = (stockItem) => {
+    const item = stockItem.toObject ? stockItem.toObject() : stockItem;
+
+    if (item.currentStock < 0) {
+        item.stockStatus = "negative";
+    } else if (item.currentStock <= item.minStockLevel) {
+        item.stockStatus = "low";
+    } else {
+        item.stockStatus = "ok";
+    }
+
+    return item;
+};
 const getStockItems = async (req, res) => {
     try {
         const stockItems = await StockItem.find({ isActive: true })
             .populate("preferredSupplier", "name deliveryDays notes")
             .sort({ name: 1 });
 
-        res.status(200).json(stockItems);
+        res.status(200).json(stockItems.map(addStockStatus));
     } catch (error) {
         res.status(500).json({
             message: "Failed to fetch stock items",
@@ -26,7 +39,7 @@ const getStockItemById = async (req, res) => {
             return res.status(404).json({ message: "Stock item not found" });
         }
 
-        res.status(200).json(stockItem);
+        res.status(200).json(addStockStatus(stockItem));
     } catch (error) {
         res.status(500).json({
             message: "Failed to fetch stock item",
@@ -44,7 +57,7 @@ const createStockItem = async (req, res) => {
             "name deliveryDays notes"
         );
 
-        res.status(201).json(populatedStockItem);
+        res.status(201).json(addStockStatus(populatedStockItem));
     } catch (error) {
         res.status(400).json({
             message: "Failed to create stock item",
@@ -68,7 +81,7 @@ const updateStockItem = async (req, res) => {
             return res.status(404).json({ message: "Stock item not found" });
         }
 
-        res.status(200).json(stockItem);
+        res.status(200).json(addStockStatus(stockItem));
     } catch (error) {
         res.status(400).json({
             message: "Failed to update stock item",
@@ -119,7 +132,7 @@ const getLowStockItems = async (req, res) => {
                 };
             }
 
-            acc[supplierName].items.push(item);
+            acc[supplierName].items.push(addStockStatus(item));
             return acc;
         }, {});
 
