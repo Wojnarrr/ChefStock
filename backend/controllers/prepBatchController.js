@@ -1,7 +1,8 @@
+const mongoose = require("mongoose");
 const PrepBatch = require("../models/PrepBatch");
 const StockItem = require("../models/StockItem");
 const InventoryMovement = require("../models/InventoryMovement");
-
+const roundStock = require("../utils/roundStock");
 const getPrepBatches = async (req, res) => {
     try {
         const prepBatches = await PrepBatch.find()
@@ -38,41 +39,48 @@ const getPrepBatchById = async (req, res) => {
 };
 
 const createPrepBatch = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
+        session.startTransaction();
+
         const { inputs, outputStockItem, outputQuantity } = req.body;
 
         if (!inputs || inputs.length === 0) {
+            await session.abortTransaction();
+
             return res.status(400).json({
                 message: "Prep batch must include at least one input item.",
             });
         }
 
-        const movementRecords = [];
+        const inputStockItemsById = new Map();
 
-        // 1. Check all input stock first before changing anything
+        // 1. Validate all input stock first
         for (const input of inputs) {
-            const stockItem = await StockItem.findById(input.stockItem);
+            const stockItem = await StockItem.findById(input.stockItem).session(
+                session
+            );
 
             if (!stockItem || !stockItem.isActive) {
+                await session.abortTransaction();
+
                 return res.status(404).json({
                     message: "Input stock item not found or inactive",
                     stockItem: input.stockItem,
                 });
             }
 
-            if (stockItem.currentStock < input.quantityUsed) {
-                return res.status(400).json({
-                    message: `Not enough stock for ${stockItem.name}`,
-                    currentStock: stockItem.currentStock,
-                    requestedQuantity: input.quantityUsed,
-                    unit: stockItem.stockUnit,
-                });
-            }
+            inputStockItemsById.set(String(stockItem._id), stockItem);
         }
 
-        const outputItem = await StockItem.findById(outputStockItem);
+        const outputItem = await StockItem.findById(outputStockItem).session(
+            session
+        );
 
         if (!outputItem || !outputItem.isActive) {
+            await session.abortTransaction();
+
             return res.status(404).json({
                 message: "Output stock item not found or inactive",
                 stockItem: outputStockItem,
@@ -80,55 +88,74 @@ const createPrepBatch = async (req, res) => {
         }
 
         // 2. Save prep batch
-        const prepBatch = await PrepBatch.create(req.body);
+        const createdPrepBatches = await PrepBatch.create([req.body], {
+            session,
+        });
+
+        const prepBatch = createdPrepBatches[0];
+
+        const movementRecords = [];
 
         // 3. Deduct input stock and create prep_input movements
         for (const input of prepBatch.inputs) {
-            const stockItem = await StockItem.findById(input.stockItem);
+            const stockItem = inputStockItemsById.get(String(input.stockItem));
 
             const previousStock = stockItem.currentStock;
-            const newStock = previousStock - input.quantityUsed;
+            const newStock = roundStock(previousStock - input.quantityUsed);
 
             stockItem.currentStock = newStock;
-            await stockItem.save();
+            await stockItem.save({ session });
 
-            const movement = await InventoryMovement.create({
-                stockItem: stockItem._id,
-                movementType: "prep_input",
-                quantityChange: -input.quantityUsed,
-                unit: input.unit,
-                previousStock,
-                newStock,
-                sourceType: "PrepBatch",
-                sourceId: prepBatch._id,
-                performedBy: prepBatch.preparedBy || null,
-                notes: "Stock used as prep input",
-            });
+            const createdMovements = await InventoryMovement.create(
+                [
+                    {
+                        stockItem: stockItem._id,
+                        movementType: "prep_input",
+                        quantityChange: roundStock(-input.quantityUsed),
+                        unit: input.unit,
+                        previousStock,
+                        newStock,
+                        sourceType: "PrepBatch",
+                        sourceId: prepBatch._id,
+                        performedBy: prepBatch.preparedBy || null,
+                        notes: "Stock used as prep input",
+                    },
+                ],
+                { session }
+            );
 
-            movementRecords.push(movement);
+            movementRecords.push(createdMovements[0]);
         }
 
         // 4. Increase output stock and create prep_output movement
         const previousOutputStock = outputItem.currentStock;
-        const newOutputStock = previousOutputStock + outputQuantity;
+        const roundedOutputQuantity = roundStock(outputQuantity);
+        const newOutputStock = roundStock(previousOutputStock + roundedOutputQuantity);
 
         outputItem.currentStock = newOutputStock;
-        await outputItem.save();
+        await outputItem.save({ session });
 
-        const outputMovement = await InventoryMovement.create({
-            stockItem: outputItem._id,
-            movementType: "prep_output",
-            quantityChange: outputQuantity,
-            unit: req.body.outputUnit,
-            previousStock: previousOutputStock,
-            newStock: newOutputStock,
-            sourceType: "PrepBatch",
-            sourceId: prepBatch._id,
-            performedBy: prepBatch.preparedBy || null,
-            notes: "Prepared stock output created",
-        });
+        const createdOutputMovements = await InventoryMovement.create(
+            [
+                {
+                    stockItem: outputItem._id,
+                    movementType: "prep_output",
+                    quantityChange: roundedOutputQuantity,
+                    unit: req.body.outputUnit,
+                    previousStock: previousOutputStock,
+                    newStock: newOutputStock,
+                    sourceType: "PrepBatch",
+                    sourceId: prepBatch._id,
+                    performedBy: prepBatch.preparedBy || null,
+                    notes: "Prepared stock output created",
+                },
+            ],
+            { session }
+        );
 
-        movementRecords.push(outputMovement);
+        movementRecords.push(createdOutputMovements[0]);
+
+        await session.commitTransaction();
 
         const populatedPrepBatch = await PrepBatch.findById(prepBatch._id)
             .populate("outputStockItem", "name stockUnit currentStock")
@@ -139,10 +166,14 @@ const createPrepBatch = async (req, res) => {
             movementsCreated: movementRecords,
         });
     } catch (error) {
+        await session.abortTransaction();
+
         res.status(400).json({
             message: "Failed to create prep batch",
             error: error.message,
         });
+    } finally {
+        session.endSession();
     }
 };
 
