@@ -51,6 +51,7 @@ const createProductionBatch = async (req, res) => {
         }
 
         const deductionsToApply = [];
+        const stockWarnings = [];
 
         for (const producedItem of itemsProduced) {
             const recipe = await Recipe.findById(producedItem.recipe).populate(
@@ -80,6 +81,16 @@ const createProductionBatch = async (req, res) => {
                     stockItem,
                     recipeUsageQuantity
                 );
+
+                if (stockItem.currentStock < stockUnitDeduction) {
+                    stockWarnings.push({
+                        stockItem: stockItem.name,
+                        currentStock: stockItem.currentStock,
+                        requiredStock: stockUnitDeduction,
+                        unit: stockItem.stockUnit,
+                        message: `${stockItem.name} stock may be incorrect. App stock is ${stockItem.currentStock} ${stockItem.stockUnit}, but production needs ${stockUnitDeduction} ${stockItem.stockUnit}.`,
+                    });
+                }
 
                 deductionsToApply.push({
                     stockItem,
@@ -127,6 +138,7 @@ const createProductionBatch = async (req, res) => {
         res.status(201).json({
             productionBatch: populatedBatch,
             movementsCreated: movementRecords,
+            stockWarnings,
         });
     } catch (error) {
         res.status(400).json({

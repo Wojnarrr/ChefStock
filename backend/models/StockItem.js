@@ -69,7 +69,6 @@ const stockItemSchema = new mongoose.Schema(
             type: Number,
             required: [true, "Current stock is required"],
             default: 0,
-            min: [0, "Current stock cannot be negative"],
         },
 
         minStockLevel: {
