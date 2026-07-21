@@ -1,6 +1,7 @@
 const StockAdjustment = require("../models/StockAdjustment");
 const StockItem = require("../models/StockItem");
 const InventoryMovement = require("../models/InventoryMovement");
+const roundStock = require("../utils/roundStock");
 
 const getStockAdjustments = async (req, res) => {
     try {
@@ -30,12 +31,13 @@ const createStockAdjustment = async (req, res) => {
         }
 
         const previousStock = stockItem.currentStock;
-        const quantityChange = newStock - previousStock;
+        const roundedNewStock = roundStock(newStock);
+        const quantityChange = roundStock(roundedNewStock - previousStock);
 
         const adjustment = await StockAdjustment.create({
             stockItem: stockItem._id,
             previousStock,
-            newStock,
+            newStock: roundedNewStock,
             quantityChange,
             unit: stockItem.stockUnit,
             reason,
@@ -43,7 +45,7 @@ const createStockAdjustment = async (req, res) => {
             notes: notes || "",
         });
 
-        stockItem.currentStock = newStock;
+        stockItem.currentStock = roundedNewStock;
         await stockItem.save();
 
         const movement = await InventoryMovement.create({
@@ -52,7 +54,7 @@ const createStockAdjustment = async (req, res) => {
             quantityChange,
             unit: stockItem.stockUnit,
             previousStock,
-            newStock,
+            newStock: roundedNewStock,
             sourceType: "StockAdjustment",
             sourceId: adjustment._id,
             performedBy: adjustment.adjustedBy || null,

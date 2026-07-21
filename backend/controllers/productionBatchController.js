@@ -4,6 +4,7 @@ const StockItem = require("../models/StockItem");
 const InventoryMovement = require("../models/InventoryMovement");
 
 const convertRecipeUsageToStockUnit = require("../utils/convertRecipeUsageToStockUnit");
+const roundStock = require("../utils/roundStock");
 
 const getProductionBatches = async (req, res) => {
     try {
@@ -111,7 +112,7 @@ const createProductionBatch = async (req, res) => {
             const stockItem = await StockItem.findById(deduction.stockItem._id);
 
             const previousStock = stockItem.currentStock;
-            const newStock = previousStock - deduction.stockUnitDeduction;
+            const newStock = roundStock(previousStock - deduction.stockUnitDeduction);
 
             stockItem.currentStock = newStock;
             await stockItem.save();
@@ -119,7 +120,7 @@ const createProductionBatch = async (req, res) => {
             const movement = await InventoryMovement.create({
                 stockItem: stockItem._id,
                 movementType: "production_usage",
-                quantityChange: -deduction.stockUnitDeduction,
+                quantityChange: roundStock(-deduction.stockUnitDeduction),
                 unit: deduction.stockUnit,
                 previousStock,
                 newStock,
