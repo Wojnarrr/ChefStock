@@ -11,6 +11,7 @@ const prepBatchRoutes = require("./routes/prepBatches");
 const recipeRoutes = require("./routes/recipes");
 const productionBatchRoutes = require("./routes/productionBatches");
 const stockAdjustmentRoutes = require("./routes/stockAdjustments");
+const dashboardRoutes = require("./routes/dashboard");
 dotenv.config();
 
 const app = express();
@@ -25,6 +26,7 @@ app.use("/api/prep-batches", prepBatchRoutes);
 app.use("/api/recipes", recipeRoutes);
 app.use("/api/production-batches", productionBatchRoutes);
 app.use("/api/stock-adjustments", stockAdjustmentRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.get("/", (req, res) => {
     res.send("ChefStock API is running");
