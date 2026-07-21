@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const DeliveryRecord = require("../models/DeliveryRecord");
 const StockItem = require("../models/StockItem");
 const InventoryMovement = require("../models/InventoryMovement");
@@ -38,8 +39,26 @@ const getDeliveryById = async (req, res) => {
 };
 
 const createDelivery = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
-        const delivery = await DeliveryRecord.create(req.body);
+        session.startTransaction();
+
+        const { items } = req.body;
+
+        if (!items || items.length === 0) {
+            await session.abortTransaction();
+
+            return res.status(400).json({
+                message: "Delivery must include at least one item.",
+            });
+        }
+
+        const createdDeliveries = await DeliveryRecord.create([req.body], {
+            session,
+        });
+
+        const delivery = createdDeliveries[0];
 
         const movementRecords = [];
 
@@ -48,9 +67,13 @@ const createDelivery = async (req, res) => {
                 continue;
             }
 
-            const stockItem = await StockItem.findById(item.stockItem);
+            const stockItem = await StockItem.findById(item.stockItem).session(
+                session
+            );
 
             if (!stockItem || !stockItem.isActive) {
+                await session.abortTransaction();
+
                 return res.status(404).json({
                     message: "Stock item not found or inactive",
                     stockItem: item.stockItem,
@@ -61,23 +84,30 @@ const createDelivery = async (req, res) => {
             const newStock = previousStock + item.quantityAccepted;
 
             stockItem.currentStock = newStock;
-            await stockItem.save();
+            await stockItem.save({ session });
 
-            const movement = await InventoryMovement.create({
-                stockItem: stockItem._id,
-                movementType: "delivery",
-                quantityChange: item.quantityAccepted,
-                unit: item.unit,
-                previousStock,
-                newStock,
-                sourceType: "DeliveryRecord",
-                sourceId: delivery._id,
-                performedBy: delivery.receivedBy || null,
-                notes: `Delivery received from supplier`,
-            });
+            const createdMovements = await InventoryMovement.create(
+                [
+                    {
+                        stockItem: stockItem._id,
+                        movementType: "delivery",
+                        quantityChange: item.quantityAccepted,
+                        unit: item.unit,
+                        previousStock,
+                        newStock,
+                        sourceType: "DeliveryRecord",
+                        sourceId: delivery._id,
+                        performedBy: delivery.receivedBy || null,
+                        notes: `Delivery received from supplier`,
+                    },
+                ],
+                { session }
+            );
 
-            movementRecords.push(movement);
+            movementRecords.push(createdMovements[0]);
         }
+
+        await session.commitTransaction();
 
         const populatedDelivery = await DeliveryRecord.findById(delivery._id)
             .populate("supplier", "name deliveryDays notes")
@@ -88,10 +118,14 @@ const createDelivery = async (req, res) => {
             movementsCreated: movementRecords,
         });
     } catch (error) {
+        await session.abortTransaction();
+
         res.status(400).json({
             message: "Failed to create delivery",
             error: error.message,
         });
+    } finally {
+        session.endSession();
     }
 };
 
