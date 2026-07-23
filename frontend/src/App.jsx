@@ -62,6 +62,25 @@ function App() {
 
   return (
       <main className="page">
+        <nav className="app-nav">
+          <div className="brand">
+            <div className="brand-mark">CS</div>
+            <div>
+              <strong>ChefStock</strong>
+              <span>Inventory Manager</span>
+            </div>
+          </div>
+
+          <div className="nav-links">
+            <button className="nav-link active">Dashboard</button>
+            <button className="nav-link">Stock Items</button>
+            <button className="nav-link">Deliveries</button>
+            <button className="nav-link">Prep</button>
+            <button className="nav-link">Production</button>
+            <button className="nav-link">Adjustments</button>
+          </div>
+        </nav>
+
         <header className="dashboard-header">
           <div>
             <p className="eyebrow">Restaurant Inventory System</p>
