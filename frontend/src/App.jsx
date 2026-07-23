@@ -8,6 +8,10 @@ function App() {
   const [stockItems, setStockItems] = useState([]);
   const [activePage, setActivePage] = useState("dashboard");
 
+  const [selectedStockItem, setSelectedStockItem] = useState(null);
+  const [selectedItemMovements, setSelectedItemMovements] = useState([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -45,6 +49,33 @@ function App() {
     fetchDashboard();
   }, []);
 
+  const handleStockItemClick = async (item) => {
+    try {
+      setSelectedStockItem(item);
+      setMovementsLoading(true);
+
+      const response = await fetch(
+          `${API_BASE_URL}/inventory-movements?stockItem=${item._id}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch stock item movements");
+      }
+
+      const data = await response.json();
+      setSelectedItemMovements(data.movements);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setMovementsLoading(false);
+    }
+  };
+
+  const handleBackToStockItems = () => {
+    setSelectedStockItem(null);
+    setSelectedItemMovements([]);
+  };
+
   if (loading) {
     return (
         <main className="page">
@@ -76,14 +107,20 @@ function App() {
           <div className="nav-links">
             <button
                 className={`nav-link ${activePage === "dashboard" ? "active" : ""}`}
-                onClick={() => setActivePage("dashboard")}
+                onClick={() => {
+                  setActivePage("dashboard");
+                  setSelectedStockItem(null);
+                }}
             >
               Dashboard
             </button>
 
             <button
                 className={`nav-link ${activePage === "stock-items" ? "active" : ""}`}
-                onClick={() => setActivePage("stock-items")}
+                onClick={() => {
+                  setActivePage("stock-items");
+                  setSelectedStockItem(null);
+                }}
             >
               Stock Items
             </button>
@@ -133,9 +170,20 @@ function App() {
             <DashboardView dashboard={dashboard} />
         )}
 
-        {activePage === "stock-items" && (
-            <StockItemsView stockItems={stockItems} />
-        )}
+        {activePage === "stock-items" &&
+            (selectedStockItem ? (
+                <StockItemDetailView
+                    item={selectedStockItem}
+                    movements={selectedItemMovements}
+                    movementsLoading={movementsLoading}
+                    onBack={handleBackToStockItems}
+                />
+            ) : (
+                <StockItemsView
+                    stockItems={stockItems}
+                    onStockItemClick={handleStockItemClick}
+                />
+            ))}
 
         {activePage !== "dashboard" && activePage !== "stock-items" && (
             <ComingSoonView title={getPageTitle(activePage)} />
@@ -234,7 +282,7 @@ function DashboardView({ dashboard }) {
   );
 }
 
-function StockItemsView({ stockItems }) {
+function StockItemsView({ stockItems, onStockItemClick }) {
   return (
       <section className="panel stock-table-panel">
         <div className="panel-header">
@@ -257,7 +305,7 @@ function StockItemsView({ stockItems }) {
 
             <tbody>
             {stockItems.map((item) => (
-                <tr key={item._id}>
+                <tr key={item._id} onClick={() => onStockItemClick(item)}>
                   <td>
                     <strong>{item.name}</strong>
                   </td>
@@ -281,6 +329,85 @@ function StockItemsView({ stockItems }) {
         </div>
       </section>
   );
+}
+
+function StockItemDetailView({ item, movements, movementsLoading, onBack }) {
+  return (
+      <section className="panel stock-detail-panel">
+        <button className="back-button" onClick={onBack}>
+          ← Back to stock items
+        </button>
+
+        <div className="stock-detail-header">
+          <div>
+            <p className="eyebrow">Stock Item</p>
+            <h2>{item.name}</h2>
+            <p className="subtitle">
+              {item.category} · {item.stockType.replace("_", " ")}
+            </p>
+          </div>
+
+          <span className={`status-badge ${item.stockStatus}`}>
+          {item.stockStatus}
+        </span>
+        </div>
+
+        <section className="detail-stats-grid">
+          <StatCard
+              title="Current Stock"
+              value={`${item.currentStock} ${item.stockUnit}`}
+              description="Current app estimate"
+          />
+          <StatCard
+              title="Minimum Stock"
+              value={`${item.minStockLevel} ${item.stockUnit}`}
+              description="Low-stock threshold"
+          />
+          <StatCard
+              title="Reorder Quantity"
+              value={`${item.reorderQuantity} ${item.stockUnit}`}
+              description="Suggested reorder amount"
+          />
+        </section>
+
+        <div className="detail-section">
+          <h3>Movement History</h3>
+
+          {movementsLoading ? (
+              <p className="muted">Loading movement history...</p>
+          ) : movements.length === 0 ? (
+              <p className="muted">No movements recorded for this item yet.</p>
+          ) : (
+              <div className="item-list">
+                {movements.map((movement) => (
+                    <div className="movement-row" key={movement._id}>
+                      <div>
+                        <h3>{formatMovementType(movement.movementType)}</h3>
+                        <p>{movement.notes}</p>
+                        <p className="movement-meta">
+                          {movement.previousStock} → {movement.newStock}{" "}
+                          {movement.unit}
+                        </p>
+                      </div>
+
+                      <strong>
+                        {movement.quantityChange > 0 ? "+" : ""}
+                        {movement.quantityChange} {movement.unit}
+                      </strong>
+                    </div>
+                ))}
+              </div>
+          )}
+        </div>
+      </section>
+  );
+}
+
+function formatMovementType(type) {
+  return type
+      .split("_")
+      .map((word) => word[0].toUpperCase() + word.slice(1))
+      .join(" ");
 }
 
 function ComingSoonView({ title }) {
