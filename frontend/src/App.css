@@ -308,6 +308,14 @@ h1 {
   width: 100%;
   overflow-x: auto;
 }
+.coming-soon {
+  padding: 48px;
+}
+
+.coming-soon h2 {
+  margin: 0 0 12px;
+  font-size: 2rem;
+}
 
 .stock-table {
   width: 100%;

@@ -6,6 +6,8 @@ const API_BASE_URL = "http://localhost:5050/api";
 function App() {
   const [dashboard, setDashboard] = useState(null);
   const [stockItems, setStockItems] = useState([]);
+  const [activePage, setActivePage] = useState("dashboard");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -72,12 +74,47 @@ function App() {
           </div>
 
           <div className="nav-links">
-            <button className="nav-link active">Dashboard</button>
-            <button className="nav-link">Stock Items</button>
-            <button className="nav-link">Deliveries</button>
-            <button className="nav-link">Prep</button>
-            <button className="nav-link">Production</button>
-            <button className="nav-link">Adjustments</button>
+            <button
+                className={`nav-link ${activePage === "dashboard" ? "active" : ""}`}
+                onClick={() => setActivePage("dashboard")}
+            >
+              Dashboard
+            </button>
+
+            <button
+                className={`nav-link ${activePage === "stock-items" ? "active" : ""}`}
+                onClick={() => setActivePage("stock-items")}
+            >
+              Stock Items
+            </button>
+
+            <button
+                className={`nav-link ${activePage === "deliveries" ? "active" : ""}`}
+                onClick={() => setActivePage("deliveries")}
+            >
+              Deliveries
+            </button>
+
+            <button
+                className={`nav-link ${activePage === "prep" ? "active" : ""}`}
+                onClick={() => setActivePage("prep")}
+            >
+              Prep
+            </button>
+
+            <button
+                className={`nav-link ${activePage === "production" ? "active" : ""}`}
+                onClick={() => setActivePage("production")}
+            >
+              Production
+            </button>
+
+            <button
+                className={`nav-link ${activePage === "adjustments" ? "active" : ""}`}
+                onClick={() => setActivePage("adjustments")}
+            >
+              Adjustments
+            </button>
           </div>
         </nav>
 
@@ -92,6 +129,33 @@ function App() {
           </div>
         </header>
 
+        {activePage === "dashboard" && (
+            <DashboardView dashboard={dashboard} />
+        )}
+
+        {activePage === "stock-items" && (
+            <StockItemsView stockItems={stockItems} />
+        )}
+
+        {activePage !== "dashboard" && activePage !== "stock-items" && (
+            <ComingSoonView title={getPageTitle(activePage)} />
+        )}
+      </main>
+  );
+}
+
+function StatCard({ title, value, description }) {
+  return (
+      <div className="stat-card">
+        <p>{title}</p>
+        <strong>{value}</strong>
+        <span>{description}</span>
+      </div>
+  );
+}
+function DashboardView({ dashboard }) {
+  return (
+      <>
         <section className="stats-grid">
           <StatCard
               title="Active Stock Items"
@@ -166,63 +230,80 @@ function App() {
             </div>
           </div>
         </section>
-
-        <section className="panel stock-table-panel">
-          <div className="panel-header">
-            <h2>All Stock Items</h2>
-            <span>{stockItems.length}</span>
-          </div>
-
-          <div className="table-wrapper">
-            <table className="stock-table">
-              <thead>
-              <tr>
-                <th>Item</th>
-                <th>Category</th>
-                <th>Type</th>
-                <th>Current Stock</th>
-                <th>Minimum</th>
-                <th>Status</th>
-              </tr>
-              </thead>
-
-              <tbody>
-              {stockItems.map((item) => (
-                  <tr key={item._id}>
-                    <td>
-                      <strong>{item.name}</strong>
-                    </td>
-                    <td>{item.category}</td>
-                    <td>{item.stockType.replace("_", " ")}</td>
-                    <td>
-                      {item.currentStock} {item.stockUnit}
-                    </td>
-                    <td>
-                      {item.minStockLevel} {item.stockUnit}
-                    </td>
-                    <td>
-                    <span className={`status-badge ${item.stockStatus}`}>
-                      {item.stockStatus}
-                    </span>
-                    </td>
-                  </tr>
-              ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </main>
+      </>
   );
 }
 
-function StatCard({ title, value, description }) {
+function StockItemsView({ stockItems }) {
   return (
-      <div className="stat-card">
-        <p>{title}</p>
-        <strong>{value}</strong>
-        <span>{description}</span>
-      </div>
+      <section className="panel stock-table-panel">
+        <div className="panel-header">
+          <h2>All Stock Items</h2>
+          <span>{stockItems.length}</span>
+        </div>
+
+        <div className="table-wrapper">
+          <table className="stock-table">
+            <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th>Type</th>
+              <th>Current Stock</th>
+              <th>Minimum</th>
+              <th>Status</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            {stockItems.map((item) => (
+                <tr key={item._id}>
+                  <td>
+                    <strong>{item.name}</strong>
+                  </td>
+                  <td>{item.category}</td>
+                  <td>{item.stockType.replace("_", " ")}</td>
+                  <td>
+                    {item.currentStock} {item.stockUnit}
+                  </td>
+                  <td>
+                    {item.minStockLevel} {item.stockUnit}
+                  </td>
+                  <td>
+                  <span className={`status-badge ${item.stockStatus}`}>
+                    {item.stockStatus}
+                  </span>
+                  </td>
+                </tr>
+            ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
   );
 }
 
+function ComingSoonView({ title }) {
+  return (
+      <section className="panel coming-soon">
+        <p className="eyebrow">Coming soon</p>
+        <h2>{title}</h2>
+        <p className="subtitle">
+          This section will be added after the dashboard and stock item views are
+          finished.
+        </p>
+      </section>
+  );
+}
+
+function getPageTitle(activePage) {
+  const titles = {
+    deliveries: "Deliveries",
+    prep: "Prep Batches",
+    production: "Production Batches",
+    adjustments: "Stock Adjustments",
+  };
+
+  return titles[activePage] || "Coming Soon";
+}
 export default App;
