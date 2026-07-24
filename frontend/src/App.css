@@ -86,7 +86,8 @@ textarea {
 }
 
 .stock-form input,
-.stock-form select {
+.stock-form select,
+.stock-form textarea {
   width: 100%;
   border: 1px solid rgba(23, 32, 24, 0.12);
   border-radius: 14px;
@@ -97,11 +98,14 @@ textarea {
 }
 
 .stock-form input:focus,
-.stock-form select:focus {
+.stock-form select:focus,
+.stock-form textarea:focus {
   border-color: #2d6a4f;
   box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.12);
 }
-
+.full-width-label {
+  margin-top: 16px;
+}
 .checkbox-row {
   display: flex;
   gap: 20px;

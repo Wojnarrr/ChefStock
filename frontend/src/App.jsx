@@ -7,11 +7,13 @@ function App() {
   const [dashboard, setDashboard] = useState(null);
   const [stockItems, setStockItems] = useState([]);
   const [activePage, setActivePage] = useState("dashboard");
-
+  const [suppliers, setSuppliers] = useState([]);
+  const [deliveries, setDeliveries] = useState([]);
   const [selectedStockItem, setSelectedStockItem] = useState(null);
   const [selectedItemMovements, setSelectedItemMovements] = useState([]);
   const [movementsLoading, setMovementsLoading] = useState(false);
   const [showCreateStockItemForm, setShowCreateStockItemForm] = useState(false);
+  const [showCreateDeliveryForm, setShowCreateDeliveryForm] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,10 +21,17 @@ function App() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const [dashboardResponse, stockItemsResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/dashboard/summary`),
-          fetch(`${API_BASE_URL}/stock-items`),
-        ]);
+          const [
+              dashboardResponse,
+              stockItemsResponse,
+              suppliersResponse,
+              deliveriesResponse,
+          ] = await Promise.all([
+              fetch(`${API_BASE_URL}/dashboard/summary`),
+              fetch(`${API_BASE_URL}/stock-items`),
+              fetch(`${API_BASE_URL}/suppliers`),
+              fetch(`${API_BASE_URL}/deliveries`),
+          ]);
 
         if (!dashboardResponse.ok) {
           throw new Error("Failed to fetch dashboard data");
@@ -31,15 +40,27 @@ function App() {
         if (!stockItemsResponse.ok) {
           throw new Error("Failed to fetch stock items");
         }
+        if (!suppliersResponse.ok) {
+            throw new Error("Failed to fetch suppliers");
+        }
+
+        if (!deliveriesResponse.ok) {
+            throw new Error("Failed to fetch deliveries");
+        }
 
         const dashboardData = await dashboardResponse.json();
         const stockItemsData = await stockItemsResponse.json();
+        const suppliersData = await suppliersResponse.json();
+        const deliveriesData = await deliveriesResponse.json();
 
         console.log("Dashboard data:", dashboardData);
         console.log("Stock items data:", stockItemsData);
 
         setDashboard(dashboardData);
         setStockItems(stockItemsData);
+        setSuppliers(suppliersData);
+        setDeliveries(deliveriesData);
+
       } catch (error) {
         setError(error.message);
       } finally {
@@ -87,6 +108,28 @@ function App() {
       const data = await response.json();
       setStockItems(data);
   };
+  const refreshDashboard = async () => {
+      const response = await fetch(`${API_BASE_URL}/dashboard/summary`);
+
+      if (!response.ok) {
+          throw new Error("Failed to refresh dashboard");
+      }
+
+      const data = await response.json();
+      setDashboard(data);
+  };
+
+  const refreshDeliveries = async () => {
+      const response = await fetch(`${API_BASE_URL}/deliveries`);
+
+      if (!response.ok) {
+          throw new Error("Failed to refresh deliveries");
+      }
+
+      const data = await response.json();
+      setDeliveries(data);
+  };
+
   const handleCreateStockItem = async (formData) => {
       try {
           const payload = {
@@ -129,6 +172,52 @@ function App() {
 
           await refreshStockItems();
           setShowCreateStockItemForm(false);
+      } catch (error) {
+          setError(error.message);
+      }
+  };
+  const handleCreateDelivery = async (formData) => {
+      try {
+          const selectedStockItem = stockItems.find(
+              (item) => item._id === formData.stockItem
+          );
+
+          const payload = {
+              supplier: formData.supplier,
+              invoiceNumber: formData.invoiceNumber,
+              items: [
+                  {
+                      stockItem: formData.stockItem,
+                      quantityReceived: Number(formData.quantityReceived),
+                      quantityAccepted: Number(formData.quantityAccepted),
+                      unit: selectedStockItem.stockUnit,
+                      batchNumber: formData.batchNumber,
+                      expiryDate: formData.expiryDate || null,
+                      issueType: formData.issueType,
+                      issueNotes: formData.issueNotes,
+                  },
+              ],
+              notes: formData.notes,
+          };
+
+          const response = await fetch(`${API_BASE_URL}/deliveries`, {
+              method: "POST",
+              headers: {
+                  "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Failed to create delivery");
+          }
+
+          await refreshDashboard();
+          await refreshStockItems();
+          await refreshDeliveries();
+
+          setShowCreateDeliveryForm(false);
       } catch (error) {
           setError(error.message);
       }
@@ -185,9 +274,14 @@ function App() {
 
             <button
                 className={`nav-link ${activePage === "deliveries" ? "active" : ""}`}
-                onClick={() => setActivePage("deliveries")}
+                onClick={() => {
+                    setActivePage("deliveries");
+                    setSelectedStockItem(null);
+                    setShowCreateStockItemForm(false);
+                    setShowCreateDeliveryForm(false);
+                }}
             >
-              Deliveries
+                Deliveries
             </button>
 
             <button
@@ -224,9 +318,7 @@ function App() {
           </div>
         </header>
 
-        {activePage === "dashboard" && (
-            <DashboardView dashboard={dashboard} />
-        )}
+          {activePage === "dashboard" && <DashboardView dashboard={dashboard} />}
 
           {activePage === "stock-items" &&
               (selectedStockItem ? (
@@ -236,26 +328,39 @@ function App() {
                       movementsLoading={movementsLoading}
                       onBack={handleBackToStockItems}
                   />
+              ) : showCreateStockItemForm ? (
+                  <CreateStockItemForm
+                      onSubmit={handleCreateStockItem}
+                      onCancel={() => setShowCreateStockItemForm(false)}
+                  />
               ) : (
-                  <>
-                      {showCreateStockItemForm ? (
-                          <CreateStockItemForm
-                              onSubmit={handleCreateStockItem}
-                              onCancel={() => setShowCreateStockItemForm(false)}
-                          />
-                      ) : (
-                          <StockItemsView
-                              stockItems={stockItems}
-                              onStockItemClick={handleStockItemClick}
-                              onAddStockItem={() => setShowCreateStockItemForm(true)}
-                          />
-                      )}
-                  </>
+                  <StockItemsView
+                      stockItems={stockItems}
+                      onStockItemClick={handleStockItemClick}
+                      onAddStockItem={() => setShowCreateStockItemForm(true)}
+                  />
               ))}
 
-        {activePage !== "dashboard" && activePage !== "stock-items" && (
-            <ComingSoonView title={getPageTitle(activePage)} />
-        )}
+          {activePage === "deliveries" &&
+              (showCreateDeliveryForm ? (
+                  <CreateDeliveryForm
+                      suppliers={suppliers}
+                      stockItems={stockItems}
+                      onSubmit={handleCreateDelivery}
+                      onCancel={() => setShowCreateDeliveryForm(false)}
+                  />
+              ) : (
+                  <DeliveriesView
+                      deliveries={deliveries}
+                      onAddDelivery={() => setShowCreateDeliveryForm(true)}
+                  />
+              ))}
+
+          {activePage !== "dashboard" &&
+              activePage !== "stock-items" &&
+              activePage !== "deliveries" && (
+                  <ComingSoonView title={getPageTitle(activePage)} />
+              )}
       </main>
   );
 }
@@ -735,6 +840,251 @@ function UnitOptions() {
             <option value="can">can</option>
             <option value="container">container</option>
         </>
+    );
+}
+function DeliveriesView({ deliveries, onAddDelivery }) {
+    return (
+        <section className="panel stock-table-panel">
+            <div className="panel-header">
+                <div>
+                    <h2>Deliveries</h2>
+                    <p className="panel-subtitle">
+                        Stock received from suppliers and added into inventory.
+                    </p>
+                </div>
+
+                <div className="panel-actions">
+                    <span>{deliveries.length}</span>
+                    <button className="primary-button" onClick={onAddDelivery}>
+                        Add Delivery
+                    </button>
+                </div>
+            </div>
+
+            <div className="table-wrapper">
+                <table className="stock-table">
+                    <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Supplier</th>
+                        <th>Invoice</th>
+                        <th>Items</th>
+                        <th>Notes</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    {deliveries.map((delivery) => (
+                        <tr key={delivery._id}>
+                            <td>{new Date(delivery.deliveryDate).toLocaleDateString()}</td>
+                            <td>{delivery.supplier?.name || "Unknown supplier"}</td>
+                            <td>{delivery.invoiceNumber || "—"}</td>
+                            <td>
+                                {delivery.items.map((item) => (
+                                    <div key={item.stockItem?._id || item.stockItem}>
+                                        <strong>{item.stockItem?.name || "Unknown item"}</strong>{" "}
+                                        +{item.quantityAccepted} {item.unit}
+                                    </div>
+                                ))}
+                            </td>
+                            <td>{delivery.notes || "—"}</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+}
+function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
+    const [formData, setFormData] = useState({
+        supplier: suppliers[0]?._id || "",
+        stockItem: stockItems[0]?._id || "",
+        quantityReceived: "1",
+        quantityAccepted: "1",
+        invoiceNumber: "",
+        batchNumber: "",
+        expiryDate: "",
+        issueType: "none",
+        issueNotes: "",
+        notes: "",
+    });
+
+    const selectedStockItem = stockItems.find(
+        (item) => item._id === formData.stockItem
+    );
+
+    const handleChange = (event) => {
+        const { name, value } = event.target;
+
+        setFormData((currentFormData) => ({
+            ...currentFormData,
+            [name]: value,
+        }));
+    };
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        onSubmit(formData);
+    };
+
+    return (
+        <section className="panel form-panel">
+            <div className="panel-header">
+                <div>
+                    <h2>Add Delivery</h2>
+                    <p className="panel-subtitle">
+                        Record stock received from a supplier.
+                    </p>
+                </div>
+            </div>
+
+            <form className="stock-form" onSubmit={handleSubmit}>
+                <div className="form-grid">
+                    <label>
+                        Supplier
+                        <select
+                            name="supplier"
+                            value={formData.supplier}
+                            onChange={handleChange}
+                            required
+                        >
+                            {suppliers.map((supplier) => (
+                                <option key={supplier._id} value={supplier._id}>
+                                    {supplier.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label>
+                        Stock Item
+                        <select
+                            name="stockItem"
+                            value={formData.stockItem}
+                            onChange={handleChange}
+                            required
+                        >
+                            {stockItems.map((item) => (
+                                <option key={item._id} value={item._id}>
+                                    {item.name} ({item.stockUnit})
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label>
+                        Quantity Received
+                        <input
+                            name="quantityReceived"
+                            type="number"
+                            step="0.001"
+                            value={formData.quantityReceived}
+                            onChange={handleChange}
+                            required
+                        />
+                    </label>
+
+                    <label>
+                        Quantity Accepted
+                        <input
+                            name="quantityAccepted"
+                            type="number"
+                            step="0.001"
+                            value={formData.quantityAccepted}
+                            onChange={handleChange}
+                            required
+                        />
+                    </label>
+
+                    <label>
+                        Unit
+                        <input
+                            value={selectedStockItem?.stockUnit || ""}
+                            disabled
+                            readOnly
+                        />
+                    </label>
+
+                    <label>
+                        Invoice Number
+                        <input
+                            name="invoiceNumber"
+                            value={formData.invoiceNumber}
+                            onChange={handleChange}
+                            placeholder="e.g. INV-123"
+                        />
+                    </label>
+
+                    <label>
+                        Batch Number
+                        <input
+                            name="batchNumber"
+                            value={formData.batchNumber}
+                            onChange={handleChange}
+                            placeholder="Optional"
+                        />
+                    </label>
+
+                    <label>
+                        Expiry Date
+                        <input
+                            name="expiryDate"
+                            type="date"
+                            value={formData.expiryDate}
+                            onChange={handleChange}
+                        />
+                    </label>
+
+                    <label>
+                        Issue Type
+                        <select
+                            name="issueType"
+                            value={formData.issueType}
+                            onChange={handleChange}
+                        >
+                            <option value="none">None</option>
+                            <option value="missing">Missing</option>
+                            <option value="extra">Extra</option>
+                            <option value="damaged">Damaged</option>
+                            <option value="wrong_item">Wrong Item</option>
+                            <option value="wrong_quantity">Wrong Quantity</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        Issue Notes
+                        <input
+                            name="issueNotes"
+                            value={formData.issueNotes}
+                            onChange={handleChange}
+                            placeholder="Optional"
+                        />
+                    </label>
+                </div>
+
+                <label className="full-width-label">
+                    Delivery Notes
+                    <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleChange}
+                        placeholder="Optional delivery notes"
+                        rows="3"
+                    />
+                </label>
+
+                <div className="form-actions">
+                    <button type="button" className="secondary-button" onClick={onCancel}>
+                        Cancel
+                    </button>
+                    <button type="submit" className="primary-button">
+                        Create Delivery
+                    </button>
+                </div>
+            </form>
+        </section>
     );
 }
 function ComingSoonView({ title }) {
