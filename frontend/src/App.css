@@ -129,7 +129,78 @@ textarea {
   gap: 10px;
   margin-top: 26px;
 }
+.delivery-items-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-top: 28px;
+  margin-bottom: 14px;
+}
 
+.delivery-items-header h3 {
+  margin: 0;
+}
+
+.delivery-items-list {
+  display: grid;
+  gap: 16px;
+}
+
+.delivery-item-card {
+  padding: 18px;
+  border-radius: 20px;
+  background: #f8f6f0;
+  border: 1px solid rgba(23, 32, 24, 0.08);
+}
+
+.delivery-item-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.delivery-item-card-header h4 {
+  margin: 0;
+}
+
+@media (max-width: 750px) {
+  .delivery-items-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.delivery-days-section {
+  margin-top: 24px;
+}
+
+.delivery-days-section h3 {
+  margin: 0 0 12px;
+}
+
+.day-checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.day-checkbox {
+  display: flex !important;
+  grid-template-columns: auto !important;
+  align-items: center;
+  gap: 8px !important;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: #f8f6f0;
+  border: 1px solid rgba(23, 32, 24, 0.08);
+  color: #172018 !important;
+}
+
+.day-checkbox input {
+  width: auto;
+}
 @media (max-width: 750px) {
   .form-grid {
     grid-template-columns: 1fr;
