@@ -15,6 +15,8 @@ function App() {
   const [showCreateStockItemForm, setShowCreateStockItemForm] = useState(false);
   const [showCreateDeliveryForm, setShowCreateDeliveryForm] = useState(false);
   const [showCreateSupplierForm, setShowCreateSupplierForm] = useState(false);
+  const [prepBatches, setPrepBatches] = useState([]);
+  const [showCreatePrepBatchForm, setShowCreatePrepBatchForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -26,11 +28,13 @@ function App() {
               stockItemsResponse,
               suppliersResponse,
               deliveriesResponse,
+              prepBatchesResponse,
           ] = await Promise.all([
               fetch(`${API_BASE_URL}/dashboard/summary`),
               fetch(`${API_BASE_URL}/stock-items`),
               fetch(`${API_BASE_URL}/suppliers`),
               fetch(`${API_BASE_URL}/deliveries`),
+              fetch(`${API_BASE_URL}/prep-batches`),
           ]);
 
         if (!dashboardResponse.ok) {
@@ -47,11 +51,15 @@ function App() {
         if (!deliveriesResponse.ok) {
             throw new Error("Failed to fetch deliveries");
         }
+        if (!prepBatchesResponse.ok) {
+            throw new Error("Failed to fetch prep batches");
+        }
 
         const dashboardData = await dashboardResponse.json();
         const stockItemsData = await stockItemsResponse.json();
         const suppliersData = await suppliersResponse.json();
         const deliveriesData = await deliveriesResponse.json();
+        const prepBatchesData = await prepBatchesResponse.json();
 
         console.log("Dashboard data:", dashboardData);
         console.log("Stock items data:", stockItemsData);
@@ -60,6 +68,7 @@ function App() {
         setStockItems(stockItemsData);
         setSuppliers(suppliersData);
         setDeliveries(deliveriesData);
+        setPrepBatches(prepBatchesData);
 
       } catch (error) {
         setError(error.message);
@@ -137,6 +146,68 @@ function App() {
       }
        const data = await response.json();
       setSuppliers(data);
+  };
+  const refreshPrepBatches = async () => {
+      const response = await fetch(`${API_BASE_URL}/prep-batches`);
+
+      if (!response.ok) {
+          throw new Error("Failed to refresh prep batches");
+      }
+
+      const data = await response.json();
+      setPrepBatches(data);
+  };
+  const handleCreatePrepBatch = async (formData) => {
+      try {
+          const payload = {
+              inputItems: formData.inputItems.map((inputItem) => {
+                  const selectedStockItem = stockItems.find(
+                      (stockItem) => stockItem._id === inputItem.stockItem
+                  );
+
+                  return {
+                      stockItem: inputItem.stockItem,
+                      quantityUsed: Number(inputItem.quantityUsed),
+                      unit: selectedStockItem.stockUnit,
+                  };
+              }),
+
+              outputItems: formData.outputItems.map((outputItem) => {
+                  const selectedStockItem = stockItems.find(
+                      (stockItem) => stockItem._id === outputItem.stockItem
+                  );
+
+                  return {
+                      stockItem: outputItem.stockItem,
+                      quantityProduced: Number(outputItem.quantityProduced),
+                      unit: selectedStockItem.stockUnit,
+                  };
+              }),
+
+              notes: formData.notes,
+          };
+
+          const response = await fetch(`${API_BASE_URL}/prep-batches`, {
+              method: "POST",
+              headers: {
+                  "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Failed to create prep batch");
+          }
+
+          await refreshDashboard();
+          await refreshStockItems();
+          await refreshPrepBatches();
+
+          setShowCreatePrepBatchForm(false);
+      } catch (error) {
+          setError(error.message);
+      }
   };
 
   const handleCreateStockItem = async (formData) => {
@@ -306,6 +377,9 @@ function App() {
                 onClick={() => {
                   setActivePage("stock-items");
                   setSelectedStockItem(null);
+                  setShowCreateDeliveryForm(false);
+                  setShowCreateSupplierForm(false);
+                  setShowCreatePrepBatchForm(false);
                 }}
             >
               Stock Items
@@ -318,6 +392,8 @@ function App() {
                     setSelectedStockItem(null);
                     setShowCreateStockItemForm(false);
                     setShowCreateDeliveryForm(false);
+                    setShowCreateSupplierForm(false);
+                    setShowCreatePrepBatchForm(false);
                 }}
             >
                 Deliveries
@@ -330,16 +406,24 @@ function App() {
                       setShowCreateStockItemForm(false);
                       setShowCreateDeliveryForm(false);
                       setShowCreateSupplierForm(false);
+                      setShowCreatePrepBatchForm(false);
                   }}
               >
                   Suppliers
               </button>
-            <button
-                className={`nav-link ${activePage === "prep" ? "active" : ""}`}
-                onClick={() => setActivePage("prep")}
-            >
-              Prep
-            </button>
+              <button
+                  className={`nav-link ${activePage === "prep" ? "active" : ""}`}
+                  onClick={() => {
+                      setActivePage("prep");
+                      setSelectedStockItem(null);
+                      setShowCreateStockItemForm(false);
+                      setShowCreateDeliveryForm(false);
+                      setShowCreateSupplierForm(false);
+                      setShowCreatePrepBatchForm(false);
+                  }}
+              >
+                  Prep
+              </button>
 
             <button
                 className={`nav-link ${activePage === "production" ? "active" : ""}`}
@@ -417,9 +501,23 @@ function App() {
                       onAddSupplier={() => setShowCreateSupplierForm(true)}
                   />
               ))}
+          {activePage === "prep" &&
+              (showCreatePrepBatchForm ? (
+                  <CreatePrepBatchForm
+                      stockItems={stockItems}
+                      onSubmit={handleCreatePrepBatch}
+                      onCancel={() => setShowCreatePrepBatchForm(false)}
+                  />
+              ) : (
+                  <PrepBatchesView
+                      prepBatches={prepBatches}
+                      onAddPrepBatch={() => setShowCreatePrepBatchForm(true)}
+                  />
+              ))}
           {activePage !== "dashboard" &&
               activePage !== "stock-items" &&
               activePage !== "suppliers" &&
+              activePage !== "prep" &&
               activePage !== "deliveries" && (
                   <ComingSoonView title={getPageTitle(activePage)} />
               )}
@@ -1428,6 +1526,380 @@ function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
                     </button>
                     <button type="submit" className="primary-button">
                         Create Delivery
+                    </button>
+                </div>
+            </form>
+        </section>
+    );
+}
+function PrepBatchesView({ prepBatches, onAddPrepBatch }) {
+    return (
+        <section className="panel stock-table-panel">
+            <div className="panel-header">
+                <div>
+                    <h2>Prep Batches</h2>
+                    <p className="panel-subtitle">
+                        Kitchen prep that converts raw or delivered stock into prepared items.
+                    </p>
+                </div>
+
+                <div className="panel-actions">
+                    <span>{prepBatches.length}</span>
+                    <button className="primary-button" onClick={onAddPrepBatch}>
+                        Add Prep Batch
+                    </button>
+                </div>
+            </div>
+
+            {prepBatches.length === 0 ? (
+                <p className="muted">No prep batches recorded yet.</p>
+            ) : (
+                <div className="table-wrapper">
+                    <table className="stock-table">
+                        <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Inputs Used</th>
+                            <th>Outputs Produced</th>
+                            <th>Notes</th>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        {prepBatches.map((prepBatch) => (
+                            <tr key={prepBatch._id}>
+                                <td>{new Date(prepBatch.createdAt).toLocaleDateString()}</td>
+
+                                <td>
+                                    {prepBatch.inputItems?.map((item, index) => (
+                                        <div key={index}>
+                                            <strong>{item.stockItem?.name || "Unknown item"}</strong>{" "}
+                                            -{item.quantityUsed} {item.unit}
+                                        </div>
+                                    ))}
+                                </td>
+
+                                <td>
+                                    {prepBatch.outputItems?.map((item, index) => (
+                                        <div key={index}>
+                                            <strong>{item.stockItem?.name || "Unknown item"}</strong>{" "}
+                                            +{item.quantityProduced} {item.unit}
+                                        </div>
+                                    ))}
+                                </td>
+
+                                <td>{prepBatch.notes || "—"}</td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
+    );
+}
+function CreatePrepBatchForm({ stockItems, onSubmit, onCancel }) {
+    const createEmptyInputItem = () => ({
+        stockItem: stockItems[0]?._id || "",
+        quantityUsed: "1",
+    });
+
+    const createEmptyOutputItem = () => ({
+        stockItem: stockItems[0]?._id || "",
+        quantityProduced: "1",
+    });
+
+    const [formData, setFormData] = useState({
+        inputItems: [createEmptyInputItem()],
+        outputItems: [createEmptyOutputItem()],
+        notes: "",
+    });
+
+    const handleInputItemChange = (index, event) => {
+        const { name, value } = event.target;
+
+        setFormData((currentFormData) => {
+            const updatedInputItems = currentFormData.inputItems.map((item, itemIndex) => {
+                if (itemIndex !== index) {
+                    return item;
+                }
+
+                return {
+                    ...item,
+                    [name]: value,
+                };
+            });
+
+            return {
+                ...currentFormData,
+                inputItems: updatedInputItems,
+            };
+        });
+    };
+
+    const handleOutputItemChange = (index, event) => {
+        const { name, value } = event.target;
+
+        setFormData((currentFormData) => {
+            const updatedOutputItems = currentFormData.outputItems.map((item, itemIndex) => {
+                if (itemIndex !== index) {
+                    return item;
+                }
+
+                return {
+                    ...item,
+                    [name]: value,
+                };
+            });
+
+            return {
+                ...currentFormData,
+                outputItems: updatedOutputItems,
+            };
+        });
+    };
+
+    const handleAddInputItem = () => {
+        setFormData((currentFormData) => ({
+            ...currentFormData,
+            inputItems: [...currentFormData.inputItems, createEmptyInputItem()],
+        }));
+    };
+
+    const handleAddOutputItem = () => {
+        setFormData((currentFormData) => ({
+            ...currentFormData,
+            outputItems: [...currentFormData.outputItems, createEmptyOutputItem()],
+        }));
+    };
+
+    const handleRemoveInputItem = (index) => {
+        setFormData((currentFormData) => {
+            if (currentFormData.inputItems.length === 1) {
+                return currentFormData;
+            }
+
+            return {
+                ...currentFormData,
+                inputItems: currentFormData.inputItems.filter(
+                    (_, itemIndex) => itemIndex !== index
+                ),
+            };
+        });
+    };
+
+    const handleRemoveOutputItem = (index) => {
+        setFormData((currentFormData) => {
+            if (currentFormData.outputItems.length === 1) {
+                return currentFormData;
+            }
+
+            return {
+                ...currentFormData,
+                outputItems: currentFormData.outputItems.filter(
+                    (_, itemIndex) => itemIndex !== index
+                ),
+            };
+        });
+    };
+
+    const handleNotesChange = (event) => {
+        setFormData((currentFormData) => ({
+            ...currentFormData,
+            notes: event.target.value,
+        }));
+    };
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        onSubmit(formData);
+    };
+
+    return (
+        <section className="panel form-panel">
+            <div className="panel-header">
+                <div>
+                    <h2>Add Prep Batch</h2>
+                    <p className="panel-subtitle">
+                        Convert raw or delivered stock into prepared kitchen stock.
+                    </p>
+                </div>
+            </div>
+
+            <form className="stock-form" onSubmit={handleSubmit}>
+                <div className="delivery-items-header">
+                    <div>
+                        <h3>Input Items</h3>
+                        <p className="panel-subtitle">
+                            Items used up during prep.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="primary-button"
+                        onClick={handleAddInputItem}
+                    >
+                        Add Input
+                    </button>
+                </div>
+
+                <div className="delivery-items-list">
+                    {formData.inputItems.map((inputItem, index) => {
+                        const selectedStockItem = stockItems.find(
+                            (item) => item._id === inputItem.stockItem
+                        );
+
+                        return (
+                            <div className="delivery-item-card" key={index}>
+                                <div className="delivery-item-card-header">
+                                    <h4>Input {index + 1}</h4>
+
+                                    {formData.inputItems.length > 1 && (
+                                        <button
+                                            type="button"
+                                            className="secondary-button"
+                                            onClick={() => handleRemoveInputItem(index)}
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="form-grid">
+                                    <label>
+                                        Stock Item
+                                        <select
+                                            name="stockItem"
+                                            value={inputItem.stockItem}
+                                            onChange={(event) => handleInputItemChange(index, event)}
+                                            required
+                                        >
+                                            {stockItems.map((item) => (
+                                                <option key={item._id} value={item._id}>
+                                                    {item.name} ({item.stockUnit})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    <label>
+                                        Quantity Used
+                                        <input
+                                            name="quantityUsed"
+                                            type="number"
+                                            step="0.001"
+                                            value={inputItem.quantityUsed}
+                                            onChange={(event) => handleInputItemChange(index, event)}
+                                            required
+                                        />
+                                    </label>
+
+                                    <label>
+                                        Unit
+                                        <input value={selectedStockItem?.stockUnit || ""} disabled readOnly />
+                                    </label>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="delivery-items-header">
+                    <div>
+                        <h3>Output Items</h3>
+                        <p className="panel-subtitle">
+                            Prepared items created from this prep.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="primary-button"
+                        onClick={handleAddOutputItem}
+                    >
+                        Add Output
+                    </button>
+                </div>
+
+                <div className="delivery-items-list">
+                    {formData.outputItems.map((outputItem, index) => {
+                        const selectedStockItem = stockItems.find(
+                            (item) => item._id === outputItem.stockItem
+                        );
+
+                        return (
+                            <div className="delivery-item-card" key={index}>
+                                <div className="delivery-item-card-header">
+                                    <h4>Output {index + 1}</h4>
+
+                                    {formData.outputItems.length > 1 && (
+                                        <button
+                                            type="button"
+                                            className="secondary-button"
+                                            onClick={() => handleRemoveOutputItem(index)}
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="form-grid">
+                                    <label>
+                                        Stock Item
+                                        <select
+                                            name="stockItem"
+                                            value={outputItem.stockItem}
+                                            onChange={(event) => handleOutputItemChange(index, event)}
+                                            required
+                                        >
+                                            {stockItems.map((item) => (
+                                                <option key={item._id} value={item._id}>
+                                                    {item.name} ({item.stockUnit})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    <label>
+                                        Quantity Produced
+                                        <input
+                                            name="quantityProduced"
+                                            type="number"
+                                            step="0.001"
+                                            value={outputItem.quantityProduced}
+                                            onChange={(event) => handleOutputItemChange(index, event)}
+                                            required
+                                        />
+                                    </label>
+
+                                    <label>
+                                        Unit
+                                        <input value={selectedStockItem?.stockUnit || ""} disabled readOnly />
+                                    </label>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <label className="full-width-label">
+                    Prep Notes
+                    <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleNotesChange}
+                        placeholder="e.g. Cooked veg for evening service"
+                        rows="3"
+                    />
+                </label>
+
+                <div className="form-actions">
+                    <button type="button" className="secondary-button" onClick={onCancel}>
+                        Cancel
+                    </button>
+                    <button type="submit" className="primary-button">
+                        Create Prep Batch
                     </button>
                 </div>
             </form>

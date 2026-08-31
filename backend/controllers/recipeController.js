@@ -4,6 +4,7 @@ const getRecipes = async (req, res) => {
     try {
         const recipes = await Recipe.find({ isActive: true })
             .populate("ingredients.stockItem", "name stockUnit recipeUnit")
+            .populate("outputStockItem", "name stockUnit recipeUnit")
             .sort({ name: 1 });
 
         res.status(200).json(recipes);
@@ -58,7 +59,8 @@ const updateRecipe = async (req, res) => {
         const recipe = await Recipe.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true,
-        }).populate("ingredients.stockItem", "name stockUnit recipeUnit");
+        }).populate("ingredients.stockItem", "name stockUnit recipeUnit")
+            .populate("outputStockItem", "name stockUnit recipeUnit");
 
         if (!recipe || !recipe.isActive) {
             return res.status(404).json({ message: "Recipe not found" });

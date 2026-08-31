@@ -54,10 +54,45 @@ const recipeSchema = new mongoose.Schema(
             maxlength: [100, "Recipe name cannot exceed 100 characters"],
         },
 
+        recipeType: {
+            type: String,
+            required: true,
+            enum: ["production", "prep"],
+            default: "production",
+        },
+
+        outputStockItem: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "StockItem",
+            default: null,
+        },
+
+        outputQuantity: {
+            type: Number,
+            default: null,
+            min: 0,
+        },
+
         outputUnit: {
             type: String,
             required: true,
-            enum: ["pizza", "tray", "portion", "batch", "pcs"],
+            enum: [
+                "g",
+                "kg",
+                "ml",
+                "l",
+                "pcs",
+                "pack",
+                "box",
+                "case",
+                "bottle",
+                "can",
+                "container",
+                "pizza",
+                "tray",
+                "portion",
+                "batch",
+            ],
         },
 
         portionsPerOutput: {
@@ -90,5 +125,23 @@ const recipeSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+recipeSchema.pre("validate", function () {
+    if (this.recipeType === "prep") {
+        if (!this.outputStockItem) {
+            this.invalidate(
+                "outputStockItem",
+                "Prep recipes must have an output stock item."
+            );
+        }
+
+        if (!this.outputQuantity) {
+            this.invalidate(
+                "outputQuantity",
+                "Prep recipes must have an output quantity."
+            );
+        }
+    }
+});
 
 module.exports = mongoose.model("Recipe", recipeSchema);
