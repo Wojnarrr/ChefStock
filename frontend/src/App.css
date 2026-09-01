@@ -405,6 +405,20 @@ h1 {
   background: #f8f6f0;
   border: 1px solid rgba(23, 32, 24, 0.06);
 }
+.status-pill.production,
+.status-pill.prep {
+  text-transform: capitalize;
+}
+
+.status-pill.production {
+  background: #e7f0ff;
+  color: #1d4ed8;
+}
+
+.status-pill.prep {
+  background: #f0fdf4;
+  color: #15803d;
+}
 
 .stock-row h3,
 .movement-row h3 {
