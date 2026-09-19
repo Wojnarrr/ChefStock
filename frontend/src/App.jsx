@@ -11,17 +11,19 @@ import StockItemDetailView from "./pages/StockItemDetailView";
 import SuppliersView from "./pages/SuppliersView";
 import DeliveriesView from "./pages/DeliveriesView";
 import RecipesView from "./pages/RecipesView";
-import PrepBatchesView from "./pages/PrepBatchesView";
 import ProductionView from "./pages/ProductionBatchesView.jsx";
+import PrepTasksView from "./pages/PrepTasksView";
 
+import CreatePrepTaskForm from "./forms/CreatePrepTaskForm";
 import CreateStockItemForm from "./forms/CreateStockItemForm";
 import CreateSupplierForm from "./forms/CreateSupplierForm";
 import CreateDeliveryForm from "./forms/CreateDeliveryForm";
 import CreateRecipeForm from "./forms/CreateRecipeForm";
-import CreatePrepBatchForm from "./forms/CreatePrepBatchForm";
 import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
 
 import { getPageTitle } from "./constants/options";
+
+import { apiFetch } from "./utils/api";
 
 const API_BASE_URL = "http://localhost:5050/api";
 
@@ -37,12 +39,12 @@ function App() {
   const [showCreateStockItemForm, setShowCreateStockItemForm] = useState(false);
   const [showCreateDeliveryForm, setShowCreateDeliveryForm] = useState(false);
   const [showCreateSupplierForm, setShowCreateSupplierForm] = useState(false);
-  const [prepBatches, setPrepBatches] = useState([]);
   const [productionBatches, setProductionBatches] = useState([]);
   const [recipes, setRecipes] = useState([]);
   const [showCreateRecipeForm, setShowCreateRecipeForm] = useState(false);
-  const [showCreatePrepBatchForm, setShowCreatePrepBatchForm] = useState(false);
   const [showCreateProductionBatchForm, setShowCreateProductionBatchForm] = useState(false);
+  const [prepTasks, setPrepTasks] = useState([]);
+  const [showCreatePrepTaskForm, setShowCreatePrepTaskForm] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -58,6 +60,7 @@ function App() {
           prepBatchesResponse,
           recipesResponse,
           productionBatchesResponse,
+          prepTasksResponse,
         ] = await Promise.all([
           fetch(`${API_BASE_URL}/dashboard/summary`),
           fetch(`${API_BASE_URL}/stock-items`),
@@ -66,6 +69,7 @@ function App() {
           fetch(`${API_BASE_URL}/prep-batches`),
           fetch(`${API_BASE_URL}/recipes`),
           fetch(`${API_BASE_URL}/production-batches`),
+          fetch(`${API_BASE_URL}/prep-tasks`),
         ]);
 
         if (!dashboardResponse.ok) {
@@ -91,14 +95,17 @@ function App() {
         if (!productionBatchesResponse.ok) {
           throw new Error("Failed to fetch production batches");
         }
-
+        if (!prepTasksResponse.ok) {
+          throw new Error("Failed to fetch prep tasks");
+        }
         const dashboardData = await dashboardResponse.json();
         const stockItemsData = await stockItemsResponse.json();
         const suppliersData = await suppliersResponse.json();
         const deliveriesData = await deliveriesResponse.json();
-        const prepBatchesData = await prepBatchesResponse.json();
         const recipesData = await recipesResponse.json();
         const productionBatchesData = await productionBatchesResponse.json();
+        const prepTasksData = await prepTasksResponse.json();
+
         console.log("Dashboard data:", dashboardData);
         console.log("Stock items data:", stockItemsData);
 
@@ -106,9 +113,9 @@ function App() {
         setStockItems(stockItemsData);
         setSuppliers(suppliersData);
         setDeliveries(deliveriesData);
-        setPrepBatches(prepBatchesData);
         setRecipes(recipesData);
         setProductionBatches(productionBatchesData);
+        setPrepTasks(prepTasksData);
       } catch (error) {
         setError(error.message);
       } finally {
@@ -118,27 +125,20 @@ function App() {
 
     fetchDashboard();
   }, []);
-
-  const handleStockItemClick = async (item) => {
+  const loadItemMovements = async (stockItemId) => {
     try {
-      setSelectedStockItem(item);
       setMovementsLoading(true);
-
-      const response = await fetch(
-        `${API_BASE_URL}/inventory-movements?stockItem=${item._id}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch stock item movements");
-      }
-
-      const data = await response.json();
+      const data = await apiFetch(`/inventory-movements?stockItem=${stockItemId}`);
       setSelectedItemMovements(data.movements);
     } catch (error) {
       setError(error.message);
     } finally {
       setMovementsLoading(false);
     }
+  };
+  const handleStockItemClick = async (item) => {
+    setSelectedStockItem(item);
+    await loadItemMovements(item._id);
   };
 
   const handleBackToStockItems = () => {
@@ -154,135 +154,50 @@ function App() {
     setSelectedStockItem(null);
     setShowCreateDeliveryForm(false);
     setShowCreateSupplierForm(false);
-    setShowCreatePrepBatchForm(false);
     setShowCreateRecipeForm(false);
+    setShowCreateProductionBatchForm(false);
+    setShowCreatePrepTaskForm(false);
     if (page !== "stock-items") {
       setShowCreateStockItemForm(false);
     }
   };
 
+
   const refreshStockItems = async () => {
-    const response = await fetch(`${API_BASE_URL}/stock-items`);
-
-    if (!response.ok) {
-      throw new Error("Failed to refresh stock items");
-    }
-
-    const data = await response.json();
+    const data = await apiFetch("/stock-items");
     setStockItems(data);
   };
   const refreshDashboard = async () => {
-    const response = await fetch(`${API_BASE_URL}/dashboard/summary`);
-
-    if (!response.ok) {
-      throw new Error("Failed to refresh dashboard");
-    }
-
-    const data = await response.json();
+    const data = await apiFetch("/dashboard/summary");
     setDashboard(data);
   };
 
   const refreshDeliveries = async () => {
-    const response = await fetch(`${API_BASE_URL}/deliveries`);
-
-    if (!response.ok) {
-      throw new Error("Failed to refresh deliveries");
-    }
-
-    const data = await response.json();
+    const data = await apiFetch("/deliveries");
     setDeliveries(data);
   };
-  const refreshSuppliers = async () => {
-    const response = await fetch(`${API_BASE_URL}/suppliers`);
 
-    if (!response.ok) {
-      throw new Error("Failed to refresh suppliers");
-    }
-    const data = await response.json();
+  const refreshSuppliers = async () => {
+    const data = await apiFetch("/suppliers");
     setSuppliers(data);
   };
-  const refreshPrepBatches = async () => {
-    const response = await fetch(`${API_BASE_URL}/prep-batches`);
 
-    if (!response.ok) {
-      throw new Error("Failed to refresh prep batches");
-    }
+  // const refreshPrepBatches = async () => {
+  //   const data = await apiFetch("/prep-batches");
+  //   setPrepBatches(data);
+  // };
 
-    const data = await response.json();
-    setPrepBatches(data);
-  };
   const refreshRecipes = async () => {
-    const response = await fetch(`${API_BASE_URL}/recipes`);
-
-    if (!response.ok) {
-      throw new Error("Failed to refresh recipes");
-    }
-
-    const data = await response.json();
+    const data = await apiFetch("/recipes");
     setRecipes(data);
   };
   const refreshProductionBatches = async () => {
-    const response = await fetch(`${API_BASE_URL}/production-batches`);
-
-    if (!response.ok) {
-      throw new Error("Failed to refresh production batches");
-    }
-
-    const data = await response.json();
+    const data = await apiFetch("/production-batches");
     setProductionBatches(data);
   };
-
-  const handleCreatePrepBatch = async (formData) => {
-    try {
-      const payload = {
-        inputItems: formData.inputItems.map((inputItem) => {
-          const selectedStockItem = stockItems.find(
-            (stockItem) => stockItem._id === inputItem.stockItem
-          );
-
-          return {
-            stockItem: inputItem.stockItem,
-            quantityUsed: Number(inputItem.quantityUsed),
-            unit: selectedStockItem.stockUnit,
-          };
-        }),
-
-        outputItems: formData.outputItems.map((outputItem) => {
-          const selectedStockItem = stockItems.find(
-            (stockItem) => stockItem._id === outputItem.stockItem
-          );
-
-          return {
-            stockItem: outputItem.stockItem,
-            quantityProduced: Number(outputItem.quantityProduced),
-            unit: selectedStockItem.stockUnit,
-          };
-        }),
-
-        notes: formData.notes,
-      };
-
-      const response = await fetch(`${API_BASE_URL}/prep-batches`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create prep batch");
-      }
-
-      await refreshDashboard();
-      await refreshStockItems();
-      await refreshPrepBatches();
-
-      setShowCreatePrepBatchForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
+  const refreshPrepTasks = async () => {
+    const data = await apiFetch("/prep-tasks");
+    setPrepTasks(data);
   };
 
   const handleCreateStockItem = async (formData) => {
@@ -308,22 +223,14 @@ function App() {
 
       if (formData.packType === "variable") {
         payload.estimatedUnitsPerStockUnit = Number(
-          formData.estimatedUnitsPerStockUnit
+            formData.estimatedUnitsPerStockUnit
         );
       }
 
-      const response = await fetch(`${API_BASE_URL}/stock-items`, {
+      await apiFetch("/stock-items", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create stock item");
-      }
 
       await refreshStockItems();
       setShowCreateStockItemForm(false);
@@ -331,6 +238,7 @@ function App() {
       setError(error.message);
     }
   };
+
   const handleCreateDelivery = async (formData) => {
     try {
       const payload = {
@@ -338,7 +246,7 @@ function App() {
         invoiceNumber: formData.invoiceNumber,
         items: formData.items.map((deliveryItem) => {
           const selectedStockItem = stockItems.find(
-            (stockItem) => stockItem._id === deliveryItem.stockItem
+              (stockItem) => stockItem._id === deliveryItem.stockItem
           );
 
           return {
@@ -355,18 +263,10 @@ function App() {
         notes: formData.notes,
       };
 
-      const response = await fetch(`${API_BASE_URL}/deliveries`, {
+      await apiFetch("/deliveries", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create delivery");
-      }
 
       await refreshDashboard();
       await refreshStockItems();
@@ -388,19 +288,10 @@ function App() {
         notes: formData.notes,
         isActive: true,
       };
-
-      const response = await fetch(`${API_BASE_URL}/suppliers`, {
+      await apiFetch("/suppliers", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create supplier");
-      }
 
       await refreshSuppliers();
       setShowCreateSupplierForm(false);
@@ -415,12 +306,12 @@ function App() {
         recipeType: formData.recipeType,
         outputUnit: formData.outputUnit,
         portionsPerOutput:
-          formData.portionsPerOutput === ""
-            ? null
-            : Number(formData.portionsPerOutput),
+            formData.portionsPerOutput === ""
+                ? null
+                : Number(formData.portionsPerOutput),
         ingredients: formData.ingredients.map((ingredient) => {
           const selectedStockItem = stockItems.find(
-            (item) => item._id === ingredient.stockItem
+              (item) => item._id === ingredient.stockItem
           );
 
           return {
@@ -428,9 +319,9 @@ function App() {
             quantity: Number(ingredient.quantity),
             unit: ingredient.unit || selectedStockItem.recipeUnit || selectedStockItem.stockUnit,
             minQuantity:
-              ingredient.minQuantity === "" ? null : Number(ingredient.minQuantity),
+                ingredient.minQuantity === "" ? null : Number(ingredient.minQuantity),
             maxQuantity:
-              ingredient.maxQuantity === "" ? null : Number(ingredient.maxQuantity),
+                ingredient.maxQuantity === "" ? null : Number(ingredient.maxQuantity),
             isOptional: ingredient.isOptional,
             notes: ingredient.notes,
           };
@@ -444,34 +335,18 @@ function App() {
         payload.outputQuantity = Number(formData.outputQuantity);
       }
 
-      const response = await fetch(`${API_BASE_URL}/recipes`, {
+      await apiFetch("/recipes", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log("Recipe backend error:", errorData);
-        console.log("Recipe payload sent:", payload);
-
-        throw new Error(
-          errorData.error ||
-          errorData.message ||
-          JSON.stringify(errorData) ||
-          "Failed to create recipe"
-        );
-      }
-
       await refreshRecipes();
-
       setShowCreateRecipeForm(false);
     } catch (error) {
       setError(error.message);
     }
   };
+
   const handleCreateProductionBatch = async (formData) => {
     try {
       const payload = {
@@ -483,20 +358,10 @@ function App() {
         notes: formData.notes,
       };
 
-      const response = await fetch(`${API_BASE_URL}/production-batches`, {
+      const data = await apiFetch("/production-batches", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create production batch");
-      }
-
-      const data = await response.json();
 
       if (data.stockWarnings && data.stockWarnings.length > 0) {
         const warningText = data.stockWarnings.map((w) => w.message).join("\n");
@@ -508,6 +373,37 @@ function App() {
       await refreshProductionBatches();
 
       setShowCreateProductionBatchForm(false);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+  const handleCreatePrepTask = async (formData) => {
+    try {
+      await apiFetch("/prep-tasks", {
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
+
+      await refreshPrepTasks();
+      setShowCreatePrepTaskForm(false);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+  const handleCompleteTask = async (taskId) => {
+    try {
+      const data = await apiFetch(`/prep-tasks/${taskId}/complete`, {
+        method: "PATCH",
+      });
+
+      if (data.stockWarnings && data.stockWarnings.length > 0) {
+        const warningText = data.stockWarnings.map((w) => w.message).join("\n");
+        alert(`Task completed, but some stock looks off:\n\n${warningText}`);
+      }
+
+      await refreshDashboard();
+      await refreshStockItems();
+      await refreshPrepTasks();
     } catch (error) {
       setError(error.message);
     }
@@ -602,18 +498,19 @@ function App() {
           />
         ))}
       {activePage === "prep" &&
-        (showCreatePrepBatchForm ? (
-          <CreatePrepBatchForm
-            stockItems={stockItems}
-            onSubmit={handleCreatePrepBatch}
-            onCancel={() => setShowCreatePrepBatchForm(false)}
-          />
-        ) : (
-          <PrepBatchesView
-            prepBatches={prepBatches}
-            onAddPrepBatch={() => setShowCreatePrepBatchForm(true)}
-          />
-        ))}
+          (showCreatePrepTaskForm ? (
+              <CreatePrepTaskForm
+                  recipes={recipes}
+                  onSubmit={handleCreatePrepTask}
+                  onCancel={() => setShowCreatePrepTaskForm(false)}
+              />
+          ) : (
+              <PrepTasksView
+                  prepTasks={prepTasks}
+                  onAddPrepTask={() => setShowCreatePrepTaskForm(true)}
+                  onCompleteTask={handleCompleteTask}
+              />
+          ))}
       {activePage === "production" &&
           (showCreateProductionBatchForm ? (
               <CreateProductionBatchForm

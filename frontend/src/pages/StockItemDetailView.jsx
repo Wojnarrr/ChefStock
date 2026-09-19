@@ -1,6 +1,15 @@
 import StatCard from "../components/StatCard";
-
-function StockItemDetailView({ item, movements, movementsLoading, onBack }) {
+import AdjustStockForm from "../forms/AdjustStockForm";
+function StockItemDetailView({
+                                 item,
+                                 movements,
+                                 movementsLoading,
+                                 onBack,
+                                 showAdjustForm,
+                                 onAdjustStockClick,
+                                 onCancelAdjust,
+                                 onSubmitAdjustment,
+                             }) {
   return (
     <section className="panel stock-detail-panel">
       <button className="back-button" onClick={onBack}>
@@ -16,11 +25,26 @@ function StockItemDetailView({ item, movements, movementsLoading, onBack }) {
           </p>
         </div>
 
-        <span className={`status-badge ${item.stockStatus}`}>
-          {item.stockStatus}
-        </span>
+          <div className="stock-detail-header-actions">
+          <span className={`status-badge ${item.stockStatus}`}>
+            {item.stockStatus}
+          </span>
+
+              {!showAdjustForm && (
+                  <button className="secondary-button" onClick={onAdjustStockClick}>
+                      Adjust Stock
+                  </button>
+              )}
+          </div>
       </div>
 
+        {showAdjustForm && (
+            <AdjustStockForm
+                item={item}
+                onSubmit={onSubmitAdjustment}
+                onCancel={onCancelAdjust}
+            />
+        )}
       <section className="detail-stats-grid">
         <StatCard
           label="Current Stock"
