@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const supplierSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
+
         name: {
             type: String,
             required: [true, "Supplier name is required"],
@@ -63,5 +69,7 @@ const supplierSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+supplierSchema.index({ restaurant: 1, isActive: 1 });
 
 module.exports = mongoose.model("Supplier", supplierSchema);

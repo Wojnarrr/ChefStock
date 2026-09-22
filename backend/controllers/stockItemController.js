@@ -13,9 +13,13 @@ const addStockStatus = (stockItem) => {
 
     return item;
 };
+
 const getStockItems = async (req, res) => {
     try {
-        const stockItems = await StockItem.find({ isActive: true })
+        const stockItems = await StockItem.find({
+            isActive: true,
+            restaurant: req.restaurantId,
+        })
             .populate("preferredSupplier", "name deliveryDays notes")
             .sort({ name: 1 });
 
@@ -30,10 +34,10 @@ const getStockItems = async (req, res) => {
 
 const getStockItemById = async (req, res) => {
     try {
-        const stockItem = await StockItem.findById(req.params.id).populate(
-            "preferredSupplier",
-            "name deliveryDays notes"
-        );
+        const stockItem = await StockItem.findOne({
+            _id: req.params.id,
+            restaurant: req.restaurantId,
+        }).populate("preferredSupplier", "name deliveryDays notes");
 
         if (!stockItem || !stockItem.isActive) {
             return res.status(404).json({ message: "Stock item not found" });
@@ -50,7 +54,10 @@ const getStockItemById = async (req, res) => {
 
 const createStockItem = async (req, res) => {
     try {
-        const stockItem = await StockItem.create(req.body);
+        const stockItem = await StockItem.create({
+            ...req.body,
+            restaurant: req.restaurantId,
+        });
 
         const populatedStockItem = await StockItem.findById(stockItem._id).populate(
             "preferredSupplier",
@@ -68,9 +75,11 @@ const createStockItem = async (req, res) => {
 
 const updateStockItem = async (req, res) => {
     try {
-        const stockItem = await StockItem.findByIdAndUpdate(
-            req.params.id,
-            req.body,
+        const { restaurant, ...updates } = req.body;
+
+        const stockItem = await StockItem.findOneAndUpdate(
+            { _id: req.params.id, restaurant: req.restaurantId },
+            updates,
             {
                 new: true,
                 runValidators: true,
@@ -92,8 +101,8 @@ const updateStockItem = async (req, res) => {
 
 const deleteStockItem = async (req, res) => {
     try {
-        const stockItem = await StockItem.findByIdAndUpdate(
-            req.params.id,
+        const stockItem = await StockItem.findOneAndUpdate(
+            { _id: req.params.id, restaurant: req.restaurantId },
             { isActive: false },
             { new: true }
         );
@@ -115,6 +124,7 @@ const getLowStockItems = async (req, res) => {
     try {
         const stockItems = await StockItem.find({
             isActive: true,
+            restaurant: req.restaurantId,
             $expr: { $lte: ["$currentStock", "$minStockLevel"] },
         })
             .populate("preferredSupplier", "name deliveryDays notes")

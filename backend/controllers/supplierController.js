@@ -2,7 +2,11 @@ const Supplier = require("../models/Supplier");
 
 const getSuppliers = async (req, res) => {
     try {
-        const suppliers = await Supplier.find({ isActive: true }).sort({ name: 1 });
+        const suppliers = await Supplier.find({
+            isActive: true,
+            restaurant: req.restaurantId,
+        }).sort({ name: 1 });
+
         res.status(200).json(suppliers);
     } catch (error) {
         res.status(500).json({
@@ -14,7 +18,10 @@ const getSuppliers = async (req, res) => {
 
 const getSupplierById = async (req, res) => {
     try {
-        const supplier = await Supplier.findById(req.params.id);
+        const supplier = await Supplier.findOne({
+            _id: req.params.id,
+            restaurant: req.restaurantId,
+        });
 
         if (!supplier || !supplier.isActive) {
             return res.status(404).json({ message: "Supplier not found" });
@@ -31,7 +38,11 @@ const getSupplierById = async (req, res) => {
 
 const createSupplier = async (req, res) => {
     try {
-        const supplier = await Supplier.create(req.body);
+        const supplier = await Supplier.create({
+            ...req.body,
+            restaurant: req.restaurantId,
+        });
+
         res.status(201).json(supplier);
     } catch (error) {
         res.status(400).json({
@@ -43,10 +54,16 @@ const createSupplier = async (req, res) => {
 
 const updateSupplier = async (req, res) => {
     try {
-        const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
-            runValidators: true,
-        });
+        const { restaurant, ...updates } = req.body;
+
+        const supplier = await Supplier.findOneAndUpdate(
+            { _id: req.params.id, restaurant: req.restaurantId },
+            updates,
+            {
+                new: true,
+                runValidators: true,
+            }
+        );
 
         if (!supplier || !supplier.isActive) {
             return res.status(404).json({ message: "Supplier not found" });
@@ -63,8 +80,8 @@ const updateSupplier = async (req, res) => {
 
 const deleteSupplier = async (req, res) => {
     try {
-        const supplier = await Supplier.findByIdAndUpdate(
-            req.params.id,
+        const supplier = await Supplier.findOneAndUpdate(
+            { _id: req.params.id, restaurant: req.restaurantId },
             { isActive: false },
             { new: true }
         );

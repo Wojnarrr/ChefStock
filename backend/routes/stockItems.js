@@ -7,17 +7,21 @@ const {
     deleteStockItem,
     getLowStockItems,
 } = require("../controllers/stockItemController");
+const { protect, attachRestaurantContext } = require("../middleware/auth");
+const requireOwner = require("../middleware/requireOwner");
 
 const router = express.Router();
 
-router.route("/").get(getStockItems).post(createStockItem);
+router.use(protect, attachRestaurantContext);
+
+router.route("/").get(getStockItems).post(requireOwner, createStockItem);
 
 router.get("/low-stock", getLowStockItems);
 
 router
     .route("/:id")
     .get(getStockItemById)
-    .put(updateStockItem)
-    .delete(deleteStockItem);
+    .put(requireOwner, updateStockItem)
+    .delete(requireOwner, deleteStockItem);
 
 module.exports = router;

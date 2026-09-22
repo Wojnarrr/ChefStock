@@ -16,6 +16,12 @@ const validUnits = [
 
 const stockItemSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
+
         name: {
             type: String,
             required: [true, "Stock item name is required"],
@@ -130,5 +136,7 @@ stockItemSchema.pre("validate", function () {
         );
     }
 });
+
+stockItemSchema.index({ restaurant: 1, isActive: 1 });
 
 module.exports = mongoose.model("StockItem", stockItemSchema);
