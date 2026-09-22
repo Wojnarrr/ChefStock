@@ -35,6 +35,11 @@ const prepInputSchema = new mongoose.Schema(
 
 const prepBatchSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
         prepDate: {
             type: Date,
             required: true,
@@ -90,4 +95,5 @@ const prepBatchSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+prepBatchSchema.index({ restaurant: 1, isActive: 1 });
 module.exports = mongoose.model("PrepBatch", prepBatchSchema);

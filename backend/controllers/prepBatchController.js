@@ -5,7 +5,7 @@ const InventoryMovement = require("../models/InventoryMovement");
 const roundStock = require("../utils/roundStock");
 const getPrepBatches = async (req, res) => {
     try {
-        const prepBatches = await PrepBatch.find()
+        const prepBatches = await PrepBatch.find({ restaurant: req.restaurantId })
             .populate("outputStockItem", "name stockUnit currentStock")
             .populate("inputs.stockItem", "name stockUnit currentStock")
             .sort({ prepDate: -1 });
@@ -21,7 +21,10 @@ const getPrepBatches = async (req, res) => {
 
 const getPrepBatchById = async (req, res) => {
     try {
-        const prepBatch = await PrepBatch.findById(req.params.id)
+        const prepBatch = await PrepBatch.findOne({
+            _id: req.params.id,
+            restaurant: req.restaurantId,
+        })
             .populate("outputStockItem", "name stockUnit currentStock")
             .populate("inputs.stockItem", "name stockUnit currentStock");
 
@@ -58,9 +61,10 @@ const createPrepBatch = async (req, res) => {
 
         // 1. Validate all input stock first
         for (const input of inputs) {
-            const stockItem = await StockItem.findById(input.stockItem).session(
-                session
-            );
+            const stockItem = await StockItem.findOne({
+                _id: input.stockItem,
+                restaurant: req.restaurantId,
+            }).session(session);
 
             if (!stockItem || !stockItem.isActive) {
                 await session.abortTransaction();
@@ -74,9 +78,10 @@ const createPrepBatch = async (req, res) => {
             inputStockItemsById.set(String(stockItem._id), stockItem);
         }
 
-        const outputItem = await StockItem.findById(outputStockItem).session(
-            session
-        );
+        const outputItem = await StockItem.findOne({
+            _id: outputStockItem,
+            restaurant: req.restaurantId,
+        }).session(session);
 
         if (!outputItem || !outputItem.isActive) {
             await session.abortTransaction();
@@ -88,9 +93,10 @@ const createPrepBatch = async (req, res) => {
         }
 
         // 2. Save prep batch
-        const createdPrepBatches = await PrepBatch.create([req.body], {
-            session,
-        });
+        const createdPrepBatches = await PrepBatch.create(
+            [{ ...req.body, restaurant: req.restaurantId }],
+            { session }
+        );
 
         const prepBatch = createdPrepBatches[0];
 
@@ -109,6 +115,7 @@ const createPrepBatch = async (req, res) => {
             const createdMovements = await InventoryMovement.create(
                 [
                     {
+                        restaurant: req.restaurantId,
                         stockItem: stockItem._id,
                         movementType: "prep_input",
                         quantityChange: roundStock(-input.quantityUsed),
@@ -138,6 +145,7 @@ const createPrepBatch = async (req, res) => {
         const createdOutputMovements = await InventoryMovement.create(
             [
                 {
+                    restaurant: req.restaurantId,
                     stockItem: outputItem._id,
                     movementType: "prep_output",
                     quantityChange: roundedOutputQuantity,

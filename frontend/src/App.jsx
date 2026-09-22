@@ -24,7 +24,7 @@ import { getPageTitle } from "./constants/options";
 
 import { apiFetch } from "./utils/api";
 
-const API_BASE_URL = "http://localhost:5050/api";
+// const API_BASE_URL = "http://localhost:5050/api";
 
 function App() {
   const [dashboard, setDashboard] = useState(null);
@@ -55,61 +55,22 @@ function App() {
     const fetchDashboard = async () => {
       try {
         const [
-          dashboardResponse,
-          stockItemsResponse,
-          suppliersResponse,
-          deliveriesResponse,
-          prepBatchesResponse,
-          recipesResponse,
-          productionBatchesResponse,
-          prepTasksResponse,
+          dashboardData,
+          stockItemsData,
+          suppliersData,
+          deliveriesData,
+          recipesData,
+          productionBatchesData,
+          prepTasksData,
         ] = await Promise.all([
-          fetch(`${API_BASE_URL}/dashboard/summary`),
-          fetch(`${API_BASE_URL}/stock-items`),
-          fetch(`${API_BASE_URL}/suppliers`),
-          fetch(`${API_BASE_URL}/deliveries`),
-          fetch(`${API_BASE_URL}/prep-batches`),
-          fetch(`${API_BASE_URL}/recipes`),
-          fetch(`${API_BASE_URL}/production-batches`),
-          fetch(`${API_BASE_URL}/prep-tasks`),
+          apiFetch("/dashboard/summary"),
+          apiFetch("/stock-items"),
+          apiFetch("/suppliers"),
+          apiFetch("/deliveries"),
+          apiFetch("/recipes"),
+          apiFetch("/production-batches"),
+          apiFetch("/prep-tasks"),
         ]);
-
-        if (!dashboardResponse.ok) {
-          throw new Error("Failed to fetch dashboard data");
-        }
-
-        if (!stockItemsResponse.ok) {
-          throw new Error("Failed to fetch stock items");
-        }
-        if (!suppliersResponse.ok) {
-          throw new Error("Failed to fetch suppliers");
-        }
-
-        if (!deliveriesResponse.ok) {
-          throw new Error("Failed to fetch deliveries");
-        }
-        if (!prepBatchesResponse.ok) {
-          throw new Error("Failed to fetch prep batches");
-        }
-        if (!recipesResponse.ok) {
-          throw new Error("Failed to fetch recipes");
-        }
-        if (!productionBatchesResponse.ok) {
-          throw new Error("Failed to fetch production batches");
-        }
-        if (!prepTasksResponse.ok) {
-          throw new Error("Failed to fetch prep tasks");
-        }
-        const dashboardData = await dashboardResponse.json();
-        const stockItemsData = await stockItemsResponse.json();
-        const suppliersData = await suppliersResponse.json();
-        const deliveriesData = await deliveriesResponse.json();
-        const recipesData = await recipesResponse.json();
-        const productionBatchesData = await productionBatchesResponse.json();
-        const prepTasksData = await prepTasksResponse.json();
-
-        console.log("Dashboard data:", dashboardData);
-        console.log("Stock items data:", stockItemsData);
 
         setDashboard(dashboardData);
         setStockItems(stockItemsData);

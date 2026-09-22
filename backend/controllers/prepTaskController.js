@@ -9,7 +9,7 @@ const roundStock = require("../utils/roundStock");
 
 const getPrepTasks = async (req, res) => {
     try {
-        const prepTasks = await PrepTask.find()
+        const prepTasks = await PrepTask.find({ restaurant: req.restaurantId })
             .populate("linkedRecipe", "name outputUnit outputQuantity")
             .sort({ prepDate: 1, createdAt: 1 });
 
@@ -24,7 +24,10 @@ const getPrepTasks = async (req, res) => {
 
 const createPrepTask = async (req, res) => {
     try {
-        const prepTask = await PrepTask.create(req.body);
+        const prepTask = await PrepTask.create({
+            ...req.body,
+            restaurant: req.restaurantId,
+        });
 
         const populatedPrepTask = await PrepTask.findById(prepTask._id).populate(
             "linkedRecipe",
@@ -45,7 +48,10 @@ const completePrepTask = async (req, res) => {
     try {
         session.startTransaction();
 
-        const prepTask = await PrepTask.findById(req.params.id).session(session);
+        const prepTask = await PrepTask.findOne({
+            _id: req.params.id,
+            restaurant: req.restaurantId,
+        }).session(session);
 
         if (!prepTask) {
             await session.abortTransaction();
@@ -76,7 +82,10 @@ const completePrepTask = async (req, res) => {
         }
 
         // Case 2: recipe-linked task — scale ingredients and move stock
-        const recipe = await Recipe.findById(prepTask.linkedRecipe)
+        const recipe = await Recipe.findOne({
+            _id: prepTask.linkedRecipe,
+            restaurant: req.restaurantId,
+        })
             .populate("ingredients.stockItem")
             .populate("outputStockItem")
             .session(session);
@@ -134,6 +143,7 @@ const completePrepTask = async (req, res) => {
         const createdPrepBatches = await PrepBatch.create(
             [
                 {
+                    restaurant: req.restaurantId,
                     prepDate: new Date(),
                     prepType: "recipe_based",
                     outputStockItem: outputItem._id,
@@ -154,7 +164,10 @@ const completePrepTask = async (req, res) => {
         const movementRecords = [];
 
         for (const deduction of deductionsToApply) {
-            const stockItem = await StockItem.findById(deduction.stockItem._id).session(session);
+            const stockItem = await StockItem.findOne({
+                _id: deduction.stockItem._id,
+                restaurant: req.restaurantId,
+            }).session(session);
 
             const previousStock = stockItem.currentStock;
             const newStock = roundStock(previousStock - deduction.stockUnitDeduction);
@@ -165,6 +178,7 @@ const completePrepTask = async (req, res) => {
             const createdMovements = await InventoryMovement.create(
                 [
                     {
+                        restaurant: req.restaurantId,
                         stockItem: stockItem._id,
                         movementType: "prep_input",
                         quantityChange: roundStock(-deduction.stockUnitDeduction),
@@ -183,7 +197,10 @@ const completePrepTask = async (req, res) => {
             movementRecords.push(createdMovements[0]);
         }
 
-        const outputStockItem = await StockItem.findById(outputItem._id).session(session);
+        const outputStockItem = await StockItem.findOne({
+            _id: outputItem._id,
+            restaurant: req.restaurantId,
+        }).session(session);
         const previousOutputStock = outputStockItem.currentStock;
         const roundedTargetQuantity = roundStock(prepTask.targetQuantity);
         const newOutputStock = roundStock(previousOutputStock + roundedTargetQuantity);
@@ -194,6 +211,7 @@ const completePrepTask = async (req, res) => {
         const createdOutputMovements = await InventoryMovement.create(
             [
                 {
+                    restaurant: req.restaurantId,
                     stockItem: outputStockItem._id,
                     movementType: "prep_output",
                     quantityChange: roundedTargetQuantity,

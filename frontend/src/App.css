@@ -29,7 +29,15 @@ textarea {
   color: #68756a;
   font-size: 0.92rem;
 }
-
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2d6a4f;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
 .panel-actions {
   display: flex;
   align-items: center;
@@ -609,4 +617,17 @@ h1 {
 .stock-table td:nth-child(2),
 .stock-table td:nth-child(3) {
   text-transform: capitalize;
+}.error {
+   color: #c92a2a;
+   font-weight: 700;
+ }
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2d6a4f;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
 }

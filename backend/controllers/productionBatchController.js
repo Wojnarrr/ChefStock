@@ -9,7 +9,7 @@ const roundStock = require("../utils/roundStock");
 
 const getProductionBatches = async (req, res) => {
     try {
-        const batches = await ProductionBatch.find()
+        const batches = await ProductionBatch.find({ restaurant: req.restaurantId })
             .populate("itemsProduced.recipe", "name outputUnit portionsPerOutput")
             .sort({ productionDate: -1 });
 
@@ -24,10 +24,10 @@ const getProductionBatches = async (req, res) => {
 
 const getProductionBatchById = async (req, res) => {
     try {
-        const batch = await ProductionBatch.findById(req.params.id).populate(
-            "itemsProduced.recipe",
-            "name outputUnit portionsPerOutput"
-        );
+        const batch = await ProductionBatch.findOne({
+            _id: req.params.id,
+            restaurant: req.restaurantId,
+        }).populate("itemsProduced.recipe", "name outputUnit portionsPerOutput");
 
         if (!batch) {
             return res.status(404).json({ message: "Production batch not found" });
@@ -61,7 +61,10 @@ const createProductionBatch = async (req, res) => {
         const stockWarnings = [];
 
         for (const producedItem of itemsProduced) {
-            const recipe = await Recipe.findById(producedItem.recipe)
+            const recipe = await Recipe.findOne({
+                _id: producedItem.recipe,
+                restaurant: req.restaurantId,
+            })
                 .populate("ingredients.stockItem")
                 .session(session);
 
@@ -112,7 +115,7 @@ const createProductionBatch = async (req, res) => {
         }
 
         const createdProductionBatches = await ProductionBatch.create(
-            [req.body],
+            [{ ...req.body, restaurant: req.restaurantId }],
             { session }
         );
 
@@ -121,9 +124,10 @@ const createProductionBatch = async (req, res) => {
         const movementRecords = [];
 
         for (const deduction of deductionsToApply) {
-            const stockItem = await StockItem.findById(deduction.stockItem._id).session(
-                session
-            );
+            const stockItem = await StockItem.findOne({
+                _id: deduction.stockItem._id,
+                restaurant: req.restaurantId,
+            }).session(session);
 
             const previousStock = stockItem.currentStock;
             const newStock = roundStock(previousStock - deduction.stockUnitDeduction);
@@ -134,6 +138,7 @@ const createProductionBatch = async (req, res) => {
             const createdMovements = await InventoryMovement.create(
                 [
                     {
+                        restaurant: req.restaurantId,
                         stockItem: stockItem._id,
                         movementType: "production_usage",
                         quantityChange: roundStock(-deduction.stockUnitDeduction),

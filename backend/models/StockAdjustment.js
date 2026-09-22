@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const stockAdjustmentSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
+
         stockItem: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "StockItem",
@@ -57,4 +63,5 @@ const stockAdjustmentSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+stockAdjustmentSchema.index({ restaurant: 1, isActive: 1 });
 module.exports = mongoose.model("StockAdjustment", stockAdjustmentSchema);

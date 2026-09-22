@@ -5,7 +5,9 @@ const InventoryMovement = require("../models/InventoryMovement");
 
 const getDeliveries = async (req, res) => {
     try {
-        const deliveries = await DeliveryRecord.find()
+        const deliveries = await DeliveryRecord.find({
+            restaurant: req.restaurantId,
+        })
             .populate("supplier", "name deliveryDays notes")
             .populate("items.stockItem", "name stockUnit currentStock")
             .sort({ deliveryDate: -1 });
@@ -21,7 +23,10 @@ const getDeliveries = async (req, res) => {
 
 const getDeliveryById = async (req, res) => {
     try {
-        const delivery = await DeliveryRecord.findById(req.params.id)
+        const delivery = await DeliveryRecord.findOne({
+            _id: req.params.id,
+            restaurant: req.restaurantId,
+        })
             .populate("supplier", "name deliveryDays notes")
             .populate("items.stockItem", "name stockUnit currentStock");
 
@@ -54,9 +59,10 @@ const createDelivery = async (req, res) => {
             });
         }
 
-        const createdDeliveries = await DeliveryRecord.create([req.body], {
-            session,
-        });
+        const createdDeliveries = await DeliveryRecord.create(
+            [{ ...req.body, restaurant: req.restaurantId }],
+            { session }
+        );
 
         const delivery = createdDeliveries[0];
 
@@ -67,9 +73,10 @@ const createDelivery = async (req, res) => {
                 continue;
             }
 
-            const stockItem = await StockItem.findById(item.stockItem).session(
-                session
-            );
+            const stockItem = await StockItem.findOne({
+                _id: item.stockItem,
+                restaurant: req.restaurantId,
+            }).session(session);
 
             if (!stockItem || !stockItem.isActive) {
                 await session.abortTransaction();
@@ -89,6 +96,7 @@ const createDelivery = async (req, res) => {
             const createdMovements = await InventoryMovement.create(
                 [
                     {
+                        restaurant: req.restaurantId,
                         stockItem: stockItem._id,
                         movementType: "delivery",
                         quantityChange: item.quantityAccepted,

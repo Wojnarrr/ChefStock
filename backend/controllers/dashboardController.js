@@ -9,10 +9,12 @@ const getDashboardSummary = async (req, res) => {
     try {
         const totalActiveStockItems = await StockItem.countDocuments({
             isActive: true,
+            restaurant: req.restaurantId,
         });
 
         const lowStockItems = await StockItem.find({
             isActive: true,
+            restaurant: req.restaurantId,
             $expr: { $lte: ["$currentStock", "$minStockLevel"] },
         })
             .populate("preferredSupplier", "name deliveryDays notes")
@@ -20,32 +22,43 @@ const getDashboardSummary = async (req, res) => {
 
         const negativeStockItems = await StockItem.find({
             isActive: true,
+            restaurant: req.restaurantId,
             currentStock: { $lt: 0 },
         }).sort({ currentStock: 1 });
 
-        const recentMovements = await InventoryMovement.find()
+        const recentMovements = await InventoryMovement.find({
+            restaurant: req.restaurantId,
+        })
             .populate("stockItem", "name stockUnit category")
             .sort({ createdAt: -1 })
             .limit(10);
 
-        const recentDeliveries = await DeliveryRecord.find()
+        const recentDeliveries = await DeliveryRecord.find({
+            restaurant: req.restaurantId,
+        })
             .populate("supplier", "name")
             .populate("items.stockItem", "name stockUnit")
             .sort({ createdAt: -1 })
             .limit(5);
 
-        const recentPrepBatches = await PrepBatch.find()
+        const recentPrepBatches = await PrepBatch.find({
+            restaurant: req.restaurantId,
+        })
             .populate("outputStockItem", "name stockUnit")
             .populate("inputs.stockItem", "name stockUnit")
             .sort({ createdAt: -1 })
             .limit(5);
 
-        const recentProductionBatches = await ProductionBatch.find()
+        const recentProductionBatches = await ProductionBatch.find({
+            restaurant: req.restaurantId,
+        })
             .populate("itemsProduced.recipe", "name outputUnit")
             .sort({ createdAt: -1 })
             .limit(5);
 
-        const recentStockAdjustments = await StockAdjustment.find()
+        const recentStockAdjustments = await StockAdjustment.find({
+            restaurant: req.restaurantId,
+        })
             .populate("stockItem", "name stockUnit category")
             .sort({ createdAt: -1 })
             .limit(5);

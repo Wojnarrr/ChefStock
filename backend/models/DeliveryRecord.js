@@ -67,6 +67,12 @@ const deliveryItemSchema = new mongoose.Schema(
 
 const deliveryRecordSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
+
         supplier: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Supplier",
@@ -110,5 +116,7 @@ const deliveryRecordSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+deliveryRecordSchema.index({ restaurant: 1, deliveryDate: -1 });
 
 module.exports = mongoose.model("DeliveryRecord", deliveryRecordSchema);

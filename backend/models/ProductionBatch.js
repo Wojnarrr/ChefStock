@@ -24,6 +24,12 @@ const productionItemSchema = new mongoose.Schema(
 
 const productionBatchSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
+
         productionDate: {
             type: Date,
             required: true,
@@ -55,5 +61,7 @@ const productionBatchSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+productionBatchSchema.index({ restaurant: 1, isActive: 1 });
 
 module.exports = mongoose.model("ProductionBatch", productionBatchSchema);

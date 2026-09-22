@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const prepTaskSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
+
         prepDate: {
             type: Date,
             default: Date.now,
@@ -72,5 +78,6 @@ prepTaskSchema.pre("validate", function () {
         );
     }
 });
+prepTaskSchema.index({ restaurant: 1, isActive: 1 });
 
 module.exports = mongoose.model("PrepTask", prepTaskSchema);

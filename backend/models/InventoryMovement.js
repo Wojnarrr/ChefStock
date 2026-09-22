@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const inventoryMovementSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
         stockItem: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "StockItem",
@@ -71,4 +76,5 @@ const inventoryMovementSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+inventoryMovementSchema.index({ restaurant: 1, isActive: 1 });
 module.exports = mongoose.model("InventoryMovement", inventoryMovementSchema);

@@ -2,7 +2,7 @@ const InventoryMovement = require("../models/InventoryMovement");
 
 const getInventoryMovements = async (req, res) => {
     try {
-        const filter = {};
+        const filter = { restaurant: req.restaurantId };
 
         if (req.query.stockItem) {
             filter.stockItem = req.query.stockItem;

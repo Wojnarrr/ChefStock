@@ -6,7 +6,9 @@ const roundStock = require("../utils/roundStock");
 
 const getStockAdjustments = async (req, res) => {
     try {
-        const adjustments = await StockAdjustment.find()
+        const adjustments = await StockAdjustment.find({
+            restaurant: req.restaurantId,
+        })
             .populate("stockItem", "name stockUnit currentStock category")
             .sort({ createdAt: -1 });
 
@@ -27,7 +29,10 @@ const createStockAdjustment = async (req, res) => {
 
         const { stockItem: stockItemId, newStock, reason, notes } = req.body;
 
-        const stockItem = await StockItem.findById(stockItemId).session(session);
+        const stockItem = await StockItem.findOne({
+            _id: stockItemId,
+            restaurant: req.restaurantId,
+        }).session(session);
 
         if (!stockItem || !stockItem.isActive) {
             await session.abortTransaction();
@@ -44,6 +49,7 @@ const createStockAdjustment = async (req, res) => {
         const createdAdjustments = await StockAdjustment.create(
             [
                 {
+                    restaurant: req.restaurantId,
                     stockItem: stockItem._id,
                     previousStock,
                     newStock: roundedNewStock,
@@ -65,6 +71,7 @@ const createStockAdjustment = async (req, res) => {
         const createdMovements = await InventoryMovement.create(
             [
                 {
+                    restaurant: req.restaurantId,
                     stockItem: stockItem._id,
                     movementType: "manual_adjustment",
                     quantityChange,

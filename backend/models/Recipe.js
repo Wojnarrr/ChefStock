@@ -47,6 +47,12 @@ const recipeIngredientSchema = new mongoose.Schema(
 
 const recipeSchema = new mongoose.Schema(
     {
+        restaurant: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Restaurant",
+            required: true,
+        },
+
         name: {
             type: String,
             required: [true, "Recipe name is required"],
@@ -143,5 +149,7 @@ recipeSchema.pre("validate", function () {
         }
     }
 });
+
+recipeSchema.index({ restaurant: 1, isActive: 1 });
 
 module.exports = mongoose.model("Recipe", recipeSchema);
