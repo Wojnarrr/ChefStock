@@ -1,16 +1,28 @@
 import { useState } from "react";
 import { DELIVERY_DAY_OPTIONS } from "../constants/options";
 
-function CreateSupplierForm({ onSubmit, onCancel }) {
-  const [formData, setFormData] = useState({
-    name: "",
-    contactPerson: "",
-    phone: "",
-    email: "",
-    deliveryDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    notes: "",
-  });
+function CreateSupplierForm({ editingSupplier, onSubmit, onCancel }) {
+  const isEditing = Boolean(editingSupplier);
 
+  const [formData, setFormData] = useState(() =>
+      editingSupplier
+          ? {
+            name: editingSupplier.name,
+            contactPerson: editingSupplier.contactPerson || "",
+            phone: editingSupplier.phone || "",
+            email: editingSupplier.email || "",
+            deliveryDays: editingSupplier.deliveryDays || [],
+            notes: editingSupplier.notes || "",
+          }
+          : {
+            name: "",
+            contactPerson: "",
+            phone: "",
+            email: "",
+            deliveryDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+            notes: "",
+          }
+  );
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -19,7 +31,6 @@ function CreateSupplierForm({ onSubmit, onCancel }) {
       [name]: value,
     }));
   };
-
   const handleDeliveryDayToggle = (day) => {
     setFormData((currentFormData) => {
       const alreadySelected = currentFormData.deliveryDays.includes(day);
@@ -42,14 +53,17 @@ function CreateSupplierForm({ onSubmit, onCancel }) {
     <section className="panel form-panel">
       <div className="panel-header">
         <div>
-          <h2>Add Supplier</h2>
+          <h2>{isEditing ? "Edit Supplier" : "Add Supplier"}</h2>
           <p className="panel-subtitle">
-            Create a supplier that can be used when recording deliveries.
+            {isEditing
+                ? "Update this supplier's details."
+                : "Create a supplier that can be used when recording deliveries."}
           </p>
         </div>
       </div>
 
       <form className="stock-form" onSubmit={handleSubmit}>
+
         <div className="form-grid">
           <label>
             Supplier Name
@@ -127,7 +141,7 @@ function CreateSupplierForm({ onSubmit, onCancel }) {
             Cancel
           </button>
           <button type="submit" className="primary-button">
-            Create Supplier
+            {isEditing ? "Save Changes" : "Create Supplier"}
           </button>
         </div>
       </form>

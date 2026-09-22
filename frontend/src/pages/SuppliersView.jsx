@@ -1,4 +1,4 @@
-function SuppliersView({ suppliers, onAddSupplier }) {
+function SuppliersView({ suppliers, onAddSupplier, onEditSupplier, onDeleteSupplier }) {
   return (
     <section className="panel stock-table-panel">
       <div className="panel-header">
@@ -23,29 +23,36 @@ function SuppliersView({ suppliers, onAddSupplier }) {
         <div className="table-wrapper">
           <table className="stock-table">
             <thead>
-              <tr>
-                <th>Name</th>
-                <th>Contact</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Delivery Days</th>
-                <th>Notes</th>
-              </tr>
+            <tr>
+              <th>Name</th>
+              <th>Contact</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Delivery Days</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
             </thead>
 
             <tbody>
-              {suppliers.map((supplier) => (
+            {suppliers.map((supplier) => (
                 <tr key={supplier._id}>
-                  <td>
-                    <strong>{supplier.name}</strong>
-                  </td>
+                  <td><strong>{supplier.name}</strong></td>
                   <td>{supplier.contactPerson || "—"}</td>
                   <td>{supplier.phone || "—"}</td>
                   <td>{supplier.email || "—"}</td>
                   <td>{supplier.deliveryDays?.join(", ") || "—"}</td>
                   <td>{supplier.notes || "—"}</td>
+                  <td className="table-actions">
+                    <button className="link-button" onClick={() => onEditSupplier(supplier)}>
+                      Edit
+                    </button>
+                    <button className="link-button danger" onClick={() => onDeleteSupplier(supplier)}>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
-              ))}
+            ))}
             </tbody>
           </table>
         </div>
