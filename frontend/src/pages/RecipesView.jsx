@@ -1,4 +1,8 @@
+import {useAuth} from "../context/AuthContext.jsx";
+
 function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
+  const {role} = useAuth()
+  const isOwner = role === 'owner';
   return (
       <section className="panel stock-table-panel">
         <div className="panel-header">
@@ -11,9 +15,11 @@ function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
 
           <div className="panel-actions">
             <span>{recipes.length}</span>
+            {isOwner && (
             <button className="primary-button" onClick={onAddRecipe}>
               Add Recipe
             </button>
+            )}
           </div>
         </div>
 
@@ -29,7 +35,9 @@ function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
                   <th>Output</th>
                   <th>Ingredients</th>
                   <th>Notes</th>
+                  {isOwner && (
                   <th></th>
+                  )}
                 </tr>
                 </thead>
 
@@ -77,7 +85,7 @@ function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
                       </td>
 
                       <td>{recipe.notes || "—"}</td>
-
+                      {isOwner && (
                       <td className="table-actions">
                         <button className="link-button" onClick={() => onEditRecipe(recipe)}>
                           Edit
@@ -86,6 +94,7 @@ function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
                           Delete
                         </button>
                       </td>
+                      )}
                     </tr>
                 ))}
                 </tbody>

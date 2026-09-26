@@ -1,11 +1,12 @@
-function PageHeader({ eyebrow, title, subtitle }) {
+function PageHeader({ eyebrow, title, subtitle, actions }) {
   return (
-    <header className="dashboard-header">
+    <header className="page-header">
       <div>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
         {subtitle && <p className="subtitle">{subtitle}</p>}
       </div>
+      {actions && <div className="page-header-actions">{actions}</div>}
     </header>
   );
 }

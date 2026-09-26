@@ -1,4 +1,8 @@
+import {useAuth} from "../context/AuthContext.jsx";
+
 function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditStockItem, onDeleteStockItem }) {
+ const {role} = useAuth();
+ const isOwner = role === 'owner';
   return (
       <section className="panel stock-table-panel">
         <div className="panel-header">
@@ -9,9 +13,11 @@ function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditSt
 
           <div className="panel-actions">
             <span>{stockItems.length}</span>
+            {isOwner && (
             <button className="primary-button" onClick={onAddStockItem}>
               Add Stock Item
             </button>
+            )}
           </div>
         </div>
 
@@ -25,7 +31,9 @@ function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditSt
               <th>Current Stock</th>
               <th>Minimum</th>
               <th>Status</th>
+              {isOwner && (
               <th></th>
+              )}
             </tr>
             </thead>
 
@@ -48,6 +56,7 @@ function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditSt
                     {item.stockStatus}
                   </span>
                   </td>
+                  {isOwner && (
                   <td className="table-actions">
                     <button
                         className="link-button"
@@ -68,6 +77,7 @@ function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditSt
                       Delete
                     </button>
                   </td>
+                  )}
                 </tr>
             ))}
             </tbody>

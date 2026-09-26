@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-import NavBar from "./components/NavBar";
+import AppLayout from "./components/AppLayout";
 import PageHeader from "./components/PageHeader";
 import ComingSoonView from "./components/ComingSoonView";
 
@@ -20,13 +20,15 @@ import CreateDeliveryForm from "./forms/CreateDeliveryForm";
 import CreateRecipeForm from "./forms/CreateRecipeForm";
 import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
 
-import { getPageTitle } from "./constants/options";
+import { getPage, canAccessPage } from "./constants/navigation";
+import { useAuth } from "./context/AuthContext";
 
 import { apiFetch } from "./utils/api";
 
 // const API_BASE_URL = "http://localhost:5050/api";
 
 function App() {
+  const { currentRestaurantId, role } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [stockItems, setStockItems] = useState([]);
   const [activePage, setActivePage] = useState("dashboard");
@@ -51,8 +53,17 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Reload everything whenever the selected restaurant changes, so switching
+  // restaurant in the sidebar shows that restaurant's data straight away.
   useEffect(() => {
+    if (!currentRestaurantId) return;
+
     const fetchDashboard = async () => {
+      setLoading(true);
+      setError("");
+      setSelectedStockItem(null);
+      setSelectedItemMovements([]);
+
       try {
         const [
           dashboardData,
@@ -87,7 +98,16 @@ function App() {
     };
 
     fetchDashboard();
-  }, []);
+  }, [currentRestaurantId]);
+
+  // If the current page isn't allowed for this role (e.g. after switching to
+  // a restaurant where you're staff), fall back to the dashboard.
+  useEffect(() => {
+    if (role && !canAccessPage(activePage, role)) {
+      setActivePage("dashboard");
+    }
+  }, [role, activePage]);
+
   const loadItemMovements = async (stockItemId) => {
     try {
       setMovementsLoading(true);
@@ -586,155 +606,168 @@ function App() {
     }
   };
 
-  if (loading) {
-    return (
-      <main className="page">
-        <p>Loading ChefStock dashboard...</p>
-      </main>
-    );
-  }
+  const page = getPage(activePage);
+  const implementedPages = [
+    "dashboard",
+    "stock-items",
+    "deliveries",
+    "suppliers",
+    "recipes",
+    "prep",
+    "production",
+  ];
 
-  if (error) {
+  const renderPageContent = () => {
+    if (loading) {
+      return <p className="muted">Loading...</p>;
+    }
+
+    if (error) {
+      return (
+        <section className="panel">
+          <p className="error">Error: {error}</p>
+        </section>
+      );
+    }
+
+    if (!canAccessPage(activePage, role)) {
+      return null;
+    }
+
     return (
-      <main className="page">
-        <h1>ChefStock</h1>
-        <p className="error">Error: {error}</p>
-      </main>
+      <>
+        {activePage === "dashboard" && <DashboardView dashboard={dashboard} />}
+
+        {activePage === "stock-items" &&
+            (selectedStockItem ? (
+                <StockItemDetailView
+                    item={selectedStockItem}
+                    movements={selectedItemMovements}
+                    movementsLoading={movementsLoading}
+                    onBack={handleBackToStockItems}
+                    showAdjustForm={showAdjustStockForm}
+                    onAdjustStockClick={() => setShowAdjustStockForm(true)}
+                    onCancelAdjust={() => setShowAdjustStockForm(false)}
+                    onSubmitAdjustment={handleCreateStockAdjustment}
+                />
+            ) : showCreateStockItemForm ? (
+                <CreateStockItemForm
+                    editingStockItem={editingStockItem}
+                    onSubmit={handleSubmitStockItem}
+                    onCancel={() => {
+                      setShowCreateStockItemForm(false);
+                      setEditingStockItem(null);
+                    }}
+                />
+            ) : (
+                <StockItemsView
+                    stockItems={stockItems}
+                    onStockItemClick={handleStockItemClick}
+                    onAddStockItem={() => setShowCreateStockItemForm(true)}
+                    onEditStockItem={handleEditStockItemClick}
+                    onDeleteStockItem={handleDeleteStockItem}
+                />
+            ))}
+
+        {activePage === "deliveries" &&
+          (showCreateDeliveryForm ? (
+            <CreateDeliveryForm
+              suppliers={suppliers}
+              stockItems={stockItems}
+              onSubmit={handleCreateDelivery}
+              onCancel={() => setShowCreateDeliveryForm(false)}
+            />
+          ) : (
+            <DeliveriesView
+              deliveries={deliveries}
+              onAddDelivery={() => setShowCreateDeliveryForm(true)}
+            />
+          ))}
+
+        {activePage === "suppliers" &&
+            (showCreateSupplierForm ? (
+                <CreateSupplierForm
+                    editingSupplier={editingSupplier}
+                    onSubmit={handleSubmitSupplier}
+                    onCancel={() => {
+                      setShowCreateSupplierForm(false);
+                      setEditingSupplier(null);
+                    }}
+                />
+            ) : (
+                <SuppliersView
+                    suppliers={suppliers}
+                    onAddSupplier={() => setShowCreateSupplierForm(true)}
+                    onEditSupplier={handleEditSupplierClick}
+                    onDeleteSupplier={handleDeleteSupplier}
+                />
+            ))}
+
+        {activePage === "recipes" &&
+            (showCreateRecipeForm ? (
+                <CreateRecipeForm
+                    recipes={recipes}
+                    stockItems={stockItems}
+                    editingRecipe={editingRecipe}
+                    onSubmit={handleSubmitRecipe}
+                    onCancel={() => {
+                      setShowCreateRecipeForm(false);
+                      setEditingRecipe(null);
+                    }}
+                />
+            ) : (
+                <RecipesView
+                    recipes={recipes}
+                    onAddRecipe={() => setShowCreateRecipeForm(true)}
+                    onEditRecipe={handleEditRecipeClick}
+                    onDeleteRecipe={handleDeleteRecipe}
+                />
+            ))}
+
+        {activePage === "prep" &&
+            (showCreatePrepTaskForm ? (
+                <CreatePrepTaskForm
+                    recipes={recipes}
+                    onSubmit={handleCreatePrepTask}
+                    onCancel={() => setShowCreatePrepTaskForm(false)}
+                />
+            ) : (
+                <PrepTasksView
+                    prepTasks={prepTasks}
+                    onAddPrepTask={() => setShowCreatePrepTaskForm(true)}
+                    onCompleteTask={handleCompleteTask}
+                />
+            ))}
+
+        {activePage === "production" &&
+            (showCreateProductionBatchForm ? (
+                <CreateProductionBatchForm
+                    recipes={recipes}
+                    onSubmit={handleCreateProductionBatch}
+                    onCancel={() => setShowCreateProductionBatchForm(false)}
+                />
+            ) : (
+                <ProductionView
+                    productionBatches={productionBatches}
+                    onAddProductionBatch={() => setShowCreateProductionBatchForm(true)}
+                />
+            ))}
+
+        {!implementedPages.includes(activePage) && (
+          <ComingSoonView title={page?.title || "Coming Soon"} />
+        )}
+      </>
     );
-  }
+  };
 
   return (
-    <main className="page">
-      <NavBar activePage={activePage} onNavigate={handleNavigate} />
+    <AppLayout activePage={activePage} onNavigate={handleNavigate}>
+      {page && (
+        <PageHeader eyebrow={page.section} title={page.title} subtitle={page.subtitle} />
+      )}
 
-      <PageHeader
-        eyebrow="Restaurant Inventory System"
-        title="ChefStock Dashboard"
-        subtitle="Live stock overview based on deliveries, prep, production and manual adjustments."
-      />
-
-      {activePage === "dashboard" && <DashboardView dashboard={dashboard} />}
-
-      {activePage === "stock-items" &&
-          (selectedStockItem ? (
-              <StockItemDetailView
-                  item={selectedStockItem}
-                  movements={selectedItemMovements}
-                  movementsLoading={movementsLoading}
-                  onBack={handleBackToStockItems}
-                  showAdjustForm={showAdjustStockForm}
-                  onAdjustStockClick={() => setShowAdjustStockForm(true)}
-                  onCancelAdjust={() => setShowAdjustStockForm(false)}
-                  onSubmitAdjustment={handleCreateStockAdjustment}
-              />
-          ) : showCreateStockItemForm ? (
-              <CreateStockItemForm
-                  editingStockItem={editingStockItem}
-                  onSubmit={handleSubmitStockItem}
-                  onCancel={() => {
-                    setShowCreateStockItemForm(false);
-                    setEditingStockItem(null);
-                  }}
-              />
-          ) : (
-              <StockItemsView
-                  stockItems={stockItems}
-                  onStockItemClick={handleStockItemClick}
-                  onAddStockItem={() => setShowCreateStockItemForm(true)}
-                  onEditStockItem={handleEditStockItemClick}
-                  onDeleteStockItem={handleDeleteStockItem}
-              />
-          ))}
-
-      {activePage === "deliveries" &&
-        (showCreateDeliveryForm ? (
-          <CreateDeliveryForm
-            suppliers={suppliers}
-            stockItems={stockItems}
-            onSubmit={handleCreateDelivery}
-            onCancel={() => setShowCreateDeliveryForm(false)}
-          />
-        ) : (
-          <DeliveriesView
-            deliveries={deliveries}
-            onAddDelivery={() => setShowCreateDeliveryForm(true)}
-          />
-        ))}
-      {activePage === "suppliers" &&
-          (showCreateSupplierForm ? (
-              <CreateSupplierForm
-                  editingSupplier={editingSupplier}
-                  onSubmit={handleSubmitSupplier}
-                  onCancel={() => {
-                    setShowCreateSupplierForm(false);
-                    setEditingSupplier(null);
-                  }}
-              />
-          ) : (
-              <SuppliersView
-                  suppliers={suppliers}
-                  onAddSupplier={() => setShowCreateSupplierForm(true)}
-                  onEditSupplier={handleEditSupplierClick}
-                  onDeleteSupplier={handleDeleteSupplier}
-              />
-          ))}
-      {activePage === "recipes" &&
-          (showCreateRecipeForm ? (
-              <CreateRecipeForm
-                  recipes={recipes}
-                  stockItems={stockItems}
-                  editingRecipe={editingRecipe}
-                  onSubmit={handleSubmitRecipe}
-                  onCancel={() => {
-                    setShowCreateRecipeForm(false);
-                    setEditingRecipe(null);
-                  }}
-              />
-          ) : (
-              <RecipesView
-                  recipes={recipes}
-                  onAddRecipe={() => setShowCreateRecipeForm(true)}
-                  onEditRecipe={handleEditRecipeClick}
-                  onDeleteRecipe={handleDeleteRecipe}
-              />
-          ))}
-      {activePage === "prep" &&
-          (showCreatePrepTaskForm ? (
-              <CreatePrepTaskForm
-                  recipes={recipes}
-                  onSubmit={handleCreatePrepTask}
-                  onCancel={() => setShowCreatePrepTaskForm(false)}
-              />
-          ) : (
-              <PrepTasksView
-                  prepTasks={prepTasks}
-                  onAddPrepTask={() => setShowCreatePrepTaskForm(true)}
-                  onCompleteTask={handleCompleteTask}
-              />
-          ))}
-      {activePage === "production" &&
-          (showCreateProductionBatchForm ? (
-              <CreateProductionBatchForm
-                  recipes={recipes}
-                  onSubmit={handleCreateProductionBatch}
-                  onCancel={() => setShowCreateProductionBatchForm(false)}
-              />
-          ) : (
-              <ProductionView
-                  productionBatches={productionBatches}
-                  onAddProductionBatch={() => setShowCreateProductionBatchForm(true)}
-              />
-          ))}
-      {activePage !== "dashboard" &&
-        activePage !== "stock-items" &&
-        activePage !== "suppliers" &&
-        activePage !== "recipes" &&
-        activePage !== "prep" &&
-          activePage !== "production" &&
-        activePage !== "deliveries" && (
-          <ComingSoonView title={getPageTitle(activePage)} />
-        )}
-    </main>
+      {renderPageContent()}
+    </AppLayout>
   );
 }
 

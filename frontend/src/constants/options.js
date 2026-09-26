@@ -31,14 +31,3 @@ export const DELIVERY_DAY_OPTIONS = [
   "Saturday",
   "Sunday",
 ];
-
-export const PAGE_TITLES = {
-  deliveries: "Deliveries",
-  prep: "Prep Batches",
-  production: "Production Batches",
-  adjustments: "Stock Adjustments",
-};
-
-export function getPageTitle(activePage) {
-  return PAGE_TITLES[activePage] || "Coming Soon";
-}

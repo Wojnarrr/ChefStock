@@ -1,5 +1,6 @@
-const TOKEN_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YWIyNzE3MzVjYWM4NTEyODVmMjUzNDYiLCJpYXQiOjE3OTAwNzkzNjgsImV4cCI6MTc5MjY3MTM2OH0.keCvsA-sa58XogM0K1JeTX9gH_zsXdMp5KvieIPRmmA";
-const RESTAURANT_ID_KEY = "6ab271735cac851285f25347";
+// Names of the localStorage entries. These are just labels, not secrets.
+const TOKEN_KEY = "chefstock_token";
+const RESTAURANT_ID_KEY = "chefstock_restaurant_id";
 
 export function getToken() {
     return localStorage.getItem(TOKEN_KEY);
