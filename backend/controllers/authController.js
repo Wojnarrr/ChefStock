@@ -10,12 +10,22 @@ const getMembershipsForUser = async (userId) => {
         "name address joinCode isActive"
     );
 
-    return memberships.map((membership) => ({
-        restaurant: membership.restaurant,
-        role: membership.role,
-    }));
-};
+    return memberships.map((membership) => {
+        const { _id, name, address, isActive, joinCode } = membership.restaurant;
 
+        return {
+            restaurant: {
+                _id,
+                name,
+                address,
+                isActive,
+                // Only owners should see the invite code.
+                ...(membership.role === "owner" && { joinCode }),
+            },
+            role: membership.role,
+        };
+    });
+};
 const registerOwner = async (req, res) => {
     try {
         const { name, email, password, restaurantName, restaurantAddress } = req.body;
