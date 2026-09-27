@@ -35,5 +35,5 @@ const restaurantSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
-
+restaurantSchema.statics.generateJoinCode = generateJoinCode;
 module.exports = mongoose.model("Restaurant", restaurantSchema);

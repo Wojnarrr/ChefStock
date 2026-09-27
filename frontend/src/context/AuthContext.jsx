@@ -118,6 +118,14 @@ export function AuthProvider({ children }) {
         setCurrentRestaurantId(restaurantId);
         setCurrentRestaurantIdState(restaurantId);
     };
+    // Re-fetches the user's memberships from the server. Used after anything
+// that changes them: renaming a restaurant, a new join code, creating or
+// joining a restaurant, or changing your own role.
+    const refreshMemberships = async () => {
+        const data = await apiFetch("/auth/me");
+        setMemberships(data.memberships);
+        return data.memberships;
+    };
 
     const currentMembership = memberships.find(
         (m) => m.restaurant._id === currentRestaurantId
@@ -137,6 +145,7 @@ export function AuthProvider({ children }) {
         registerStaff,
         logout,
         selectRestaurant,
+        refreshMemberships,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

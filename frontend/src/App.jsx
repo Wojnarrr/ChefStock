@@ -19,6 +19,7 @@ import CreateSupplierForm from "./forms/CreateSupplierForm";
 import CreateDeliveryForm from "./forms/CreateDeliveryForm";
 import CreateRecipeForm from "./forms/CreateRecipeForm";
 import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
+import ManagementView from "./pages/management/ManagementView";
 
 import { getPage, canAccessPage } from "./constants/navigation";
 import { useAuth } from "./context/AuthContext";
@@ -615,6 +616,7 @@ function App() {
     "recipes",
     "prep",
     "production",
+    "management",
   ];
 
   const renderPageContent = () => {
@@ -752,6 +754,7 @@ function App() {
                     onAddProductionBatch={() => setShowCreateProductionBatchForm(true)}
                 />
             ))}
+        {activePage === "management" && <ManagementView />}
 
         {!implementedPages.includes(activePage) && (
           <ComingSoonView title={page?.title || "Coming Soon"} />

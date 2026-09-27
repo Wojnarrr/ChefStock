@@ -159,4 +159,6 @@ module.exports = {
     registerStaff,
     login,
     getMe,
+    getMembershipsForUser,
+
 };
