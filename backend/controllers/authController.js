@@ -153,6 +153,30 @@ const getMe = async (req, res) => {
         });
     }
 };
+// PUT /api/auth/password   body: { currentPassword, newPassword }
+const changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 8) {
+            return res.status(400).json({ message: "New password must be at least 8 characters" });
+        }
+
+        // req.user was loaded by the protect middleware.
+        const passwordMatches = await req.user.comparePassword(currentPassword || "");
+
+        if (!passwordMatches) {
+            return res.status(400).json({ message: "Current password is incorrect" });
+        }
+
+        req.user.passwordHash = await bcrypt.hash(newPassword, 10);
+        await req.user.save();
+
+        res.status(200).json({ message: "Password updated" });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to change password", error: error.message });
+    }
+};
 
 module.exports = {
     registerOwner,
@@ -160,5 +184,6 @@ module.exports = {
     login,
     getMe,
     getMembershipsForUser,
+    changePassword,
 
 };

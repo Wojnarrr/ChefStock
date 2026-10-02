@@ -6,6 +6,7 @@ import {
     clearAuthStorage,
     getCurrentRestaurantId,
     setCurrentRestaurantId,
+    clearCurrentRestaurantId,
 } from "../utils/auth";
 
 const AuthContext = createContext(null);
@@ -23,19 +24,33 @@ export function AuthProvider({ children }) {
     const [initializing, setInitializing] = useState(true);
     const [error, setError] = useState("");
 
+    // Decides which restaurant is selected, given the user's memberships.
+    // Keeps `preferredId` if the user still belongs to it; otherwise picks the
+    // only restaurant if there's exactly one; otherwise selects nothing, and
+    // AuthGate shows the picker (2+ restaurants) or the join screen (0).
+    const syncSelectedRestaurant = (memberships, preferredId) => {
+        const belongsTo = (id) => memberships.some((m) => m.restaurant._id === id);
+
+        let nextId = null;
+        if (preferredId && belongsTo(preferredId)) {
+            nextId = preferredId;
+        } else if (memberships.length === 1) {
+            nextId = memberships[0].restaurant._id;
+        }
+
+        if (nextId) {
+            setCurrentRestaurantId(nextId);
+        } else {
+            clearCurrentRestaurantId();
+        }
+        setCurrentRestaurantIdState(nextId);
+    };
+
     const applyAuthResult = (data) => {
         setToken(data.token);
         setUser(data.user);
         setMemberships(data.memberships);
-
-        // If the person only has one restaurant, there's nothing to choose —
-        // select it automatically. Otherwise leave it unset so the app can
-        // show a restaurant picker.
-        if (data.memberships.length === 1) {
-            const onlyRestaurantId = data.memberships[0].restaurant._id;
-            setCurrentRestaurantId(onlyRestaurantId);
-            setCurrentRestaurantIdState(onlyRestaurantId);
-        }
+        syncSelectedRestaurant(data.memberships, getCurrentRestaurantId());
     };
 
     useEffect(() => {
@@ -52,21 +67,9 @@ export function AuthProvider({ children }) {
                 setUser(data.user);
                 setMemberships(data.memberships);
 
-                // The restaurant ID stored from last time might belong to a
-                // membership that no longer exists (e.g. removed by the owner).
-                // Only keep it if it still matches something real.
-                const storedRestaurantId = getCurrentRestaurantId();
-                const stillValid = data.memberships.some(
-                    (m) => m.restaurant._id === storedRestaurantId
-                );
-
-                if (storedRestaurantId && stillValid) {
-                    setCurrentRestaurantIdState(storedRestaurantId);
-                } else if (data.memberships.length === 1) {
-                    const onlyRestaurantId = data.memberships[0].restaurant._id;
-                    setCurrentRestaurantId(onlyRestaurantId);
-                    setCurrentRestaurantIdState(onlyRestaurantId);
-                }
+                // The restaurant saved from last time might be one the user
+                // no longer belongs to (e.g. an owner removed them).
+                syncSelectedRestaurant(data.memberships, getCurrentRestaurantId());
             } catch {
                 // Token is invalid or expired — clear it and fall back to logged-out.
                 clearAuthStorage();
@@ -124,6 +127,7 @@ export function AuthProvider({ children }) {
     const refreshMemberships = async () => {
         const data = await apiFetch("/auth/me");
         setMemberships(data.memberships);
+        syncSelectedRestaurant(data.memberships, currentRestaurantId);
         return data.memberships;
     };
 

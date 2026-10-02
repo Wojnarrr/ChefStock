@@ -20,6 +20,7 @@ import CreateDeliveryForm from "./forms/CreateDeliveryForm";
 import CreateRecipeForm from "./forms/CreateRecipeForm";
 import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
 import ManagementView from "./pages/management/ManagementView";
+import AccountView from "./pages/account/AccountView";
 
 import { getPage, canAccessPage } from "./constants/navigation";
 import { useAuth } from "./context/AuthContext";
@@ -755,6 +756,7 @@ function App() {
                 />
             ))}
         {activePage === "management" && <ManagementView />}
+        {activePage === "account" && <AccountView />}
 
         {!implementedPages.includes(activePage) && (
           <ComingSoonView title={page?.title || "Coming Soon"} />

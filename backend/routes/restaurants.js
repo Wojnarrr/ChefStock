@@ -4,6 +4,7 @@ const {
     regenerateJoinCode,
     createRestaurant,
     joinRestaurant,
+    leaveRestaurant,
 } = require("../controllers/restaurantController");
 const { protect, attachRestaurantContext } = require("../middleware/auth");
 const requireOwner = require("../middleware/requireOwner");
@@ -22,5 +23,5 @@ router.post("/join", joinRestaurant);
 // and only its owner may use them.
 router.put("/current", attachRestaurantContext, requireOwner, updateCurrentRestaurant);
 router.post("/current/join-code", attachRestaurantContext, requireOwner, regenerateJoinCode);
-
+router.delete("/:restaurantId/membership", leaveRestaurant);
 module.exports = router;

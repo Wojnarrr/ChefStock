@@ -983,14 +983,16 @@ h1 {
 
 /* ---------- Management page ---------- */
 
-.management-grid {
+.management-grid,
+.card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
   align-items: start;
 }
 
-.management-grid h2 {
+.management-grid h2,
+.card-grid h2{
   margin: 0;
   font-size: 1.15rem;
 }
@@ -1045,4 +1047,59 @@ h1 {
 .success {
   color: var(--accent);
   font-weight: 700;
+}
+/* ---------- My Account page ---------- */
+
+.detail-list {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0 0;
+}
+
+.detail-list dt {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.detail-list dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+.restaurant-list {
+  margin-top: 18px;
+}
+
+.role-tag,
+.current-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.role-tag {
+  background: var(--bg-hover);
+  color: var(--ink-muted);
+}
+
+.current-tag {
+  margin-left: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.row-actions {
+  display: flex;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+/* Centred card for the "no restaurant yet" screen */
+.narrow-panel {
+  max-width: 480px;
+  margin: 10vh auto 0;
 }

@@ -1,7 +1,7 @@
 const Restaurant = require("../models/Restaurant");
 const RestaurantMembership = require("../models/RestaurantMembership");
 const { getMembershipsForUser } = require("./authController");
-
+const mongoose = require("mongoose");
 // PUT /api/restaurants/current   body: { name, address }
 const updateCurrentRestaurant = async (req, res) => {
     try {
@@ -88,9 +88,53 @@ const joinRestaurant = async (req, res) => {
     }
 };
 
+// DELETE /api/restaurants/:restaurantId/membership
+// Removes YOUR OWN membership of a restaurant ("leave").
+const leaveRestaurant = async (req, res) => {
+    try {
+        const { restaurantId } = req.params;
+
+        if (!mongoose.isValidObjectId(restaurantId)) {
+            return res.status(404).json({ message: "You're not a member of this restaurant" });
+        }
+
+        // Looking it up by req.user._id is the permission check:
+        // you can only ever find (and delete) your own membership.
+        const membership = await RestaurantMembership.findOne({
+            user: req.user._id,
+            restaurant: restaurantId,
+        });
+
+        if (!membership) {
+            return res.status(404).json({ message: "You're not a member of this restaurant" });
+        }
+
+        if (membership.role === "owner") {
+            const owners = await RestaurantMembership.countDocuments({
+                restaurant: restaurantId,
+                role: "owner",
+            });
+
+            if (owners <= 1) {
+                return res.status(400).json({
+                    message: "You're the only owner. Make someone else an owner before leaving.",
+                });
+            }
+        }
+
+        await membership.deleteOne();
+
+        const memberships = await getMembershipsForUser(req.user._id);
+
+        res.status(200).json({ memberships });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to leave restaurant", error: error.message });
+    }
+};
 module.exports = {
     updateCurrentRestaurant,
     regenerateJoinCode,
     createRestaurant,
     joinRestaurant,
+    leaveRestaurant,
 };

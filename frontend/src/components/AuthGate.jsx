@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import LoginForm from "../pages/auth/LoginForm";
 import RegisterOwnerForm from "../pages/auth/RegisterOwnerForm";
 import RegisterStaffForm from "../pages/auth/RegisterStaffForm";
+import JoinRestaurantForm from "./JoinRestaurantForm";
 
 function RestaurantPicker() {
     const { memberships, selectRestaurant } = useAuth();
@@ -32,6 +33,28 @@ function RestaurantPicker() {
                         </button>
                     ))}
                 </div>
+            </section>
+        </main>
+    );
+}
+// Shown to someone who is logged in but belongs to no restaurant, e.g. a
+// staff member who was removed, or who left their only restaurant.
+function NoRestaurantScreen() {
+    const { user, logout } = useAuth();
+
+    return (
+        <main className="page">
+            <section className="panel form-panel narrow-panel">
+                <h2>You're not part of a restaurant yet</h2>
+                <p className="panel-subtitle">
+                    Hi {user.name}. Ask your manager for their restaurant's join code and enter it below.
+                </p>
+
+                <JoinRestaurantForm />
+
+                <button type="button" className="link-button" onClick={logout}>
+                    Log out
+                </button>
             </section>
         </main>
     );
@@ -67,7 +90,9 @@ function AuthGate({ children }) {
             </main>
         );
     }
-
+    if (memberships.length === 0) {
+        return <NoRestaurantScreen />;
+    }
     // Logged in, but no restaurant context yet — only happens for a user
     // with multiple memberships who hasn't picked one this session.
     if (!currentRestaurantId && memberships.length > 1) {
