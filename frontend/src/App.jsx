@@ -21,6 +21,7 @@ import CreateRecipeForm from "./forms/CreateRecipeForm";
 import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
 import ManagementView from "./pages/management/ManagementView";
 import AccountView from "./pages/account/AccountView";
+import MenuView from "./pages/menu/MenuView";
 
 import { getPage, canAccessPage } from "./constants/navigation";
 import { useAuth } from "./context/AuthContext";
@@ -248,50 +249,26 @@ function App() {
     }
   };
 
-  const handleSubmitStockItem = async (formData) => {
-    try {
-      const payload = {
-        name: formData.name,
-        category: formData.category,
-        stockType: formData.stockType,
-        stockUnit: formData.stockUnit,
-        recipeUnit: formData.recipeUnit,
-        packType: formData.packType,
-        minStockLevel: Number(formData.minStockLevel),
-        reorderQuantity: Number(formData.reorderQuantity),
-        trackingPriority: formData.trackingPriority,
-        requiresExpiryTracking: formData.requiresExpiryTracking,
-        requiresBatchTracking: formData.requiresBatchTracking,
-      };
-
-      if (formData.packType === "fixed") {
-        payload.unitsPerStockUnit = Number(formData.unitsPerStockUnit);
-      }
-
-      if (formData.packType === "variable") {
-        payload.estimatedUnitsPerStockUnit = Number(formData.estimatedUnitsPerStockUnit);
-      }
-
-      if (editingStockItem) {
-        await apiFetch(`/stock-items/${editingStockItem._id}`, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
-      } else {
-        payload.currentStock = Number(formData.currentStock);
-        await apiFetch("/stock-items", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-      }
-
-      await refreshStockItems();
-      setShowCreateStockItemForm(false);
-      setEditingStockItem(null);
-    } catch (error) {
-      setError(error.message);
+  // The form builds the payload and shows any error itself, so this just
+  // sends it. Errors are thrown back to the form instead of replacing the page.
+  const handleSubmitStockItem = async (payload) => {
+    if (editingStockItem) {
+      await apiFetch(`/stock-items/${editingStockItem._id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await apiFetch("/stock-items", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
     }
+
+    await refreshStockItems();
+    setShowCreateStockItemForm(false);
+    setEditingStockItem(null);
   };
+
   const handleCreateDelivery = async (formData) => {
     try {
       const payload = {
@@ -307,6 +284,8 @@ function App() {
             quantityReceived: Number(deliveryItem.quantityReceived),
             quantityAccepted: Number(deliveryItem.quantityAccepted),
             unit: selectedStockItem.stockUnit,
+            // Empty box = no price entered = null (not 0, which would mean "free").
+            unitCost: deliveryItem.unitCost === "" ? null : Number(deliveryItem.unitCost),
             batchNumber: deliveryItem.batchNumber,
             expiryDate: deliveryItem.expiryDate || null,
             issueType: deliveryItem.issueType,
@@ -618,6 +597,8 @@ function App() {
     "prep",
     "production",
     "management",
+    "account",
+    "menu",
   ];
 
   const renderPageContent = () => {
@@ -656,6 +637,7 @@ function App() {
             ) : showCreateStockItemForm ? (
                 <CreateStockItemForm
                     editingStockItem={editingStockItem}
+                    suppliers={suppliers}
                     onSubmit={handleSubmitStockItem}
                     onCancel={() => {
                       setShowCreateStockItemForm(false);
@@ -757,6 +739,7 @@ function App() {
             ))}
         {activePage === "management" && <ManagementView />}
         {activePage === "account" && <AccountView />}
+        {activePage === "menu" && <MenuView key={currentRestaurantId} />}
 
         {!implementedPages.includes(activePage) && (
           <ComingSoonView title={page?.title || "Coming Soon"} />

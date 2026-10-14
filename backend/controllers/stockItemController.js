@@ -1,5 +1,37 @@
 const StockItem = require("../models/StockItem");
+const mongoose = require("mongoose");
+const DeliveryRecord = require("../models/DeliveryRecord");
+const Supplier = require("../models/Supplier");
 
+// What a request may set. Anything else (restaurant, lastUnitCost...) is ignored.
+const EDITABLE_FIELDS = [
+    "name",
+    "category",
+    "stockType",
+    "stockUnit",
+    "recipeUnit",
+    "unitsPerStockUnit",
+    "minStockLevel",
+    "reorderQuantity",
+    "preferredSupplier",
+];
+
+const pickFields = (body, fields) => {
+    const data = {};
+    for (const field of fields) {
+        if (body[field] !== undefined) data[field] = body[field];
+    }
+    return data;
+};
+
+// The preferred supplier must be one of THIS restaurant's suppliers.
+const checkSupplier = async (supplierId, restaurantId) => {
+    if (!supplierId) return null; // none is fine
+    if (!mongoose.isValidObjectId(supplierId)) return "Supplier not found";
+
+    const supplier = await Supplier.findOne({ _id: supplierId, restaurant: restaurantId });
+    return supplier ? null : "Supplier not found";
+};
 const addStockStatus = (stockItem) => {
     const item = stockItem.toObject ? stockItem.toObject() : stockItem;
 
@@ -54,17 +86,17 @@ const getStockItemById = async (req, res) => {
 
 const createStockItem = async (req, res) => {
     try {
-        const stockItem = await StockItem.create({
-            ...req.body,
-            restaurant: req.restaurantId,
-        });
+        // Only when creating can the starting stock be set; after that,
+        // stock only changes through deliveries, prep and adjustments.
+        const data = pickFields(req.body, [...EDITABLE_FIELDS, "currentStock"]);
 
-        const populatedStockItem = await StockItem.findById(stockItem._id).populate(
-            "preferredSupplier",
-            "name deliveryDays notes"
-        );
+        const problem = await checkSupplier(data.preferredSupplier, req.restaurantId);
+        if (problem) return res.status(400).json({ message: problem });
 
-        res.status(201).json(addStockStatus(populatedStockItem));
+        const stockItem = await StockItem.create({ ...data, restaurant: req.restaurantId });
+        await stockItem.populate("preferredSupplier", "name deliveryDays notes");
+
+        res.status(201).json(addStockStatus(stockItem));
     } catch (error) {
         res.status(400).json({
             message: "Failed to create stock item",
@@ -75,20 +107,30 @@ const createStockItem = async (req, res) => {
 
 const updateStockItem = async (req, res) => {
     try {
-        const { restaurant, ...updates } = req.body;
-
-        const stockItem = await StockItem.findOneAndUpdate(
-            { _id: req.params.id, restaurant: req.restaurantId },
-            updates,
-            {
-                new: true,
-                runValidators: true,
-            }
-        ).populate("preferredSupplier", "name deliveryDays notes");
-
-        if (!stockItem || !stockItem.isActive) {
+        if (!mongoose.isValidObjectId(req.params.id)) {
             return res.status(404).json({ message: "Stock item not found" });
         }
+
+        const data = pickFields(req.body, EDITABLE_FIELDS);
+
+        const problem = await checkSupplier(data.preferredSupplier, req.restaurantId);
+        if (problem) return res.status(400).json({ message: problem });
+
+        // Load, change, save, so the model's pre("validate") check runs
+        // (findOneAndUpdate would skip it).
+        const stockItem = await StockItem.findOne({
+            _id: req.params.id,
+            restaurant: req.restaurantId,
+            isActive: true,
+        });
+
+        if (!stockItem) {
+            return res.status(404).json({ message: "Stock item not found" });
+        }
+
+        Object.assign(stockItem, data);
+        await stockItem.save();
+        await stockItem.populate("preferredSupplier", "name deliveryDays notes");
 
         res.status(200).json(addStockStatus(stockItem));
     } catch (error) {
@@ -154,7 +196,47 @@ const getLowStockItems = async (req, res) => {
         });
     }
 };
+// GET /api/stock-items/:id/price-history
+// Every price paid for this item, oldest first, taken from the deliveries.
+const getPriceHistory = async (req, res) => {
+    try {
+        const stockItemId = req.params.id;
 
+        if (!mongoose.isValidObjectId(stockItemId)) {
+            return res.status(404).json({ message: "Stock item not found" });
+        }
+
+        // "items.stockItem" searches inside the items array of each delivery.
+        const deliveries = await DeliveryRecord.find({
+            restaurant: req.restaurantId,
+            "items.stockItem": stockItemId,
+        })
+            .populate("supplier", "name")
+            .sort({ deliveryDate: 1 });
+
+        const history = [];
+
+        for (const delivery of deliveries) {
+            for (const item of delivery.items) {
+                // A delivery can contain many items; only keep this one,
+                // and only where a price was actually entered.
+                if (item.stockItem.equals(stockItemId) && item.unitCost != null) {
+                    history.push({
+                        date: delivery.deliveryDate,
+                        unitCost: item.unitCost,
+                        unit: item.unit,
+                        supplier: delivery.supplier?.name || "Unknown supplier",
+                        deliveryId: delivery._id,
+                    });
+                }
+            }
+        }
+
+        res.status(200).json(history);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch price history", error: error.message });
+    }
+};
 module.exports = {
     getStockItems,
     getStockItemById,
@@ -162,4 +244,5 @@ module.exports = {
     updateStockItem,
     deleteStockItem,
     getLowStockItems,
+    getPriceHistory,
 };

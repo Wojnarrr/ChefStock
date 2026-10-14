@@ -12,6 +12,9 @@
   --accent-hover: #24583f;
   --accent-soft: #e3efe7;
   --accent-ring: rgba(45, 106, 79, 0.14);
+  --chart-line: #2a8a5f;
+  --chart-grid: rgba(23, 32, 24, 0.08);
+  --chart-surface: #ffffff;
   --border: rgba(23, 32, 24, 0.08);
   --border-soft: rgba(23, 32, 24, 0.06);
   --border-strong: rgba(23, 32, 24, 0.12);
@@ -1102,4 +1105,309 @@ h1 {
 .narrow-panel {
   max-width: 480px;
   margin: 10vh auto 0;
+}
+/* ---------- Delivery costs ---------- */
+
+.field-hint {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.delivery-total {
+  margin: 20px 0 0;
+  text-align: right;
+  color: var(--ink-muted);
+}
+
+.delivery-total strong {
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+/* ---------- Price history chart ---------- */
+
+.detail-section + .detail-section {
+  margin-top: 32px;
+}
+
+.price-chart {
+  position: relative;
+  margin: 8px 0 12px;
+}
+
+.price-chart svg {
+  display: block;
+  overflow: visible;
+  border-radius: 8px;
+}
+
+.price-chart svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.chart-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.chart-axis-label {
+  fill: var(--ink-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--chart-line);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-dot {
+  fill: var(--chart-line);
+  stroke: var(--chart-surface); /* 2px ring so dots stay clear where they touch the line */
+  stroke-width: 2;
+}
+
+.chart-crosshair {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+}
+
+.chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.chart-tooltip strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.chart-table summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.chart-table table {
+  min-width: 0;
+  margin-top: 10px;
+}
+/* ---------- Menu page ---------- */
+
+.menu-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.notice {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  font-weight: 600;
+}
+
+.stock-table.menu-table td {
+  text-transform: none;
+  vertical-align: top;
+}
+
+.stock-table.menu-table tbody tr {
+  cursor: default;
+}
+
+.stock-table .number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cell-subtext {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.food-cost-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.food-cost-status.ok {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.food-cost-status.warn {
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+}
+
+.food-cost-status.over {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.food-cost-status.missing {
+  background: var(--bg-hover);
+  color: var(--ink-muted);
+}
+
+/* Menu item form */
+
+.size-shortcuts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--input-bg);
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.extra-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px auto auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 650px) {
+  .menu-stats {
+    grid-template-columns: 1fr;
+  }
+}
+.form-section-title {
+  margin: 28px 0 4px;
+}
+
+.form-section-title + .panel-subtitle {
+  margin-bottom: 14px;
+}
+
+.made-from-main {
+  display: block;
+}
+/* ---------- Stock item form ---------- */
+
+/* Line fields up along the top, even when one has a hint underneath. */
+.stock-form .form-grid {
+  align-items: start;
+}
+
+.choice-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice-group legend {
+  margin-bottom: 8px;
+  color: var(--ink-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.stock-form .choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--input-bg);
+  cursor: pointer;
+}
+
+.stock-form .choice input {
+  width: auto;
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.stock-form .choice.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.choice strong {
+  display: block;
+  color: var(--ink);
+}
+
+.choice small {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.input-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-with-unit span {
+  color: var(--ink-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.more-options {
+  margin-top: 22px;
+}
+
+.more-options summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.more-options .form-grid {
+  margin-top: 14px;
+}
+
+@media (max-width: 650px) {
+  .choice-group {
+    grid-template-columns: 1fr;
+  }
 }

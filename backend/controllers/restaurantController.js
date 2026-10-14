@@ -5,12 +5,21 @@ const mongoose = require("mongoose");
 // PUT /api/restaurants/current   body: { name, address }
 const updateCurrentRestaurant = async (req, res) => {
     try {
-        const { name, address } = req.body;
+        // Only copy the fields an owner is allowed to change. Anything else in
+        // the request (e.g. joinCode, isActive) is ignored.
+        const ALLOWED_FIELDS = ["name", "address", "vatRate", "targetFoodCostPercent"];
+        const updates = {};
+
+        for (const field of ALLOWED_FIELDS) {
+            if (req.body[field] !== undefined) {
+                updates[field] = req.body[field];
+            }
+        }
 
         const restaurant = await Restaurant.findByIdAndUpdate(
             req.restaurantId,
-            { name, address },
-            { new: true, runValidators: true } // return the updated doc, and check name length etc.
+            updates,
+            { new: true, runValidators: true }
         );
 
         res.status(200).json(restaurant);

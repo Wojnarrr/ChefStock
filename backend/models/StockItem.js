@@ -112,7 +112,18 @@ const stockItemSchema = new mongoose.Schema(
             enum: ["high", "medium", "low"],
             default: "medium",
         },
+        // Copy of the most recent delivery price, so costing a recipe doesn't
+        // have to search through every delivery. Updated when a delivery is saved.
+        lastUnitCost: {
+            type: Number,
+            default: null,
+            min: 0,
+        },
 
+        lastCostDate: {
+            type: Date,
+            default: null,
+        },
         isActive: {
             type: Boolean,
             default: true,
@@ -121,22 +132,21 @@ const stockItemSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// If recipes use a different unit from the one you count in (g vs case),
+// stock deduction and costing need to know how many recipe units are in one
+// stock unit. Without it they fail later with "can't convert", so ask now.
 stockItemSchema.pre("validate", function () {
-    if (this.packType === "fixed" && !this.unitsPerStockUnit) {
+    const needsConversion = this.stockUnit !== this.recipeUnit;
+    // estimatedUnitsPerStockUnit is the old field; still accepted for existing items.
+    const hasConversion = this.unitsPerStockUnit > 0 || this.estimatedUnitsPerStockUnit > 0;
+
+    if (needsConversion && !hasConversion) {
         this.invalidate(
             "unitsPerStockUnit",
-            "Fixed pack items must have unitsPerStockUnit."
-        );
-    }
-
-    if (this.packType === "variable" && !this.estimatedUnitsPerStockUnit) {
-        this.invalidate(
-            "estimatedUnitsPerStockUnit",
-            "Variable pack items should have estimatedUnitsPerStockUnit."
+            `How many ${this.recipeUnit} are in one ${this.stockUnit}? This is needed to convert between them.`
         );
     }
 });
-
 stockItemSchema.index({ restaurant: 1, isActive: 1 });
 
 module.exports = mongoose.model("StockItem", stockItemSchema);

@@ -75,6 +75,14 @@ export const NAV_SECTIONS = [
         title: "Production Batches",
         subtitle: "Batches made and the stock they used.",
       },
+      {
+        id: "menu",
+        label: "Menu",
+        icon: "tag",
+        roles: ["owner"],
+        title: "Menu",
+        subtitle: "Prices, costs and food cost % for everything you sell.",
+      },
     ],
   },
   {

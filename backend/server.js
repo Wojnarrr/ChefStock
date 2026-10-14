@@ -16,7 +16,7 @@ const prepTaskRoutes = require("./routes/prepTasks");
 const authRoutes = require("./routes/auth");
 const memberRoutes = require("./routes/members");
 const restaurantRoutes = require("./routes/restaurants");
-
+const menuItemRoutes = require("./routes/menuItems");
 dotenv.config();
 
 const app = express();
@@ -36,6 +36,7 @@ app.use("/api/prep-tasks", prepTaskRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/restaurants", restaurantRoutes);
+app.use("/api/menu-items", menuItemRoutes);
 
 app.get("/", (req, res) => {
     res.send("ChefStock API is running");

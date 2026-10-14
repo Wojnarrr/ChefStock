@@ -91,6 +91,17 @@ const createDelivery = async (req, res) => {
             const newStock = previousStock + item.quantityAccepted;
 
             stockItem.currentStock = newStock;
+
+            // Remember the latest price, but don't let a back-dated delivery
+            // overwrite a newer price.
+            const isNewestPrice =
+                !stockItem.lastCostDate || delivery.deliveryDate >= stockItem.lastCostDate;
+
+            if (item.unitCost != null && isNewestPrice) {
+                stockItem.lastUnitCost = item.unitCost;
+                stockItem.lastCostDate = delivery.deliveryDate;
+            }
+
             await stockItem.save({ session });
 
             const createdMovements = await InventoryMovement.create(

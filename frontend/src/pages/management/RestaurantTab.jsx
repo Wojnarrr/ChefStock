@@ -9,6 +9,8 @@ function RestaurantTab() {
     const [details, setDetails] = useState({
         name: restaurant.name,
         address: restaurant.address || "",
+        vatRate: restaurant.vatRate ?? "",
+        targetFoodCostPercent: restaurant.targetFoodCostPercent ?? 30,
     });
     const [newRestaurant, setNewRestaurant] = useState({ name: "", address: "" });
     const [copied, setCopied] = useState(false);
@@ -46,7 +48,12 @@ function RestaurantTab() {
             clearFeedback();
             await apiFetch("/restaurants/current", {
                 method: "PUT",
-                body: JSON.stringify(details),
+                body: JSON.stringify({
+                    ...details,
+                    // An empty box means "not set" (null), not 0% VAT.
+                    vatRate: details.vatRate === "" ? null : Number(details.vatRate),
+                    targetFoodCostPercent: Number(details.targetFoodCostPercent),
+                }),
             });
             await refreshMemberships(); // so the sidebar shows the new name
             setMessage("Restaurant details saved.");
@@ -114,6 +121,34 @@ function RestaurantTab() {
                                 onChange={(event) => setDetails({ ...details, address: event.target.value })}
                             />
                         </label>
+                        <div className="form-grid full-width-label">
+                            <label>
+                                VAT in menu prices (%)
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="100"
+                                    value={details.vatRate}
+                                    onChange={(event) => setDetails({ ...details, vatRate: event.target.value })}
+                                    placeholder="e.g. 13.5"
+                                />
+                            </label>
+                            <label>
+                                Target food cost (%)
+                                <input
+                                    type="number"
+                                    step="1"
+                                    min="1"
+                                    max="100"
+                                    value={details.targetFoodCostPercent}
+                                    onChange={(event) =>
+                                        setDetails({ ...details, targetFoodCostPercent: event.target.value })
+                                    }
+                                    required
+                                />
+                            </label>
+                        </div>
 
                         <div className="form-actions">
                             <button type="submit" className="primary-button">Save</button>

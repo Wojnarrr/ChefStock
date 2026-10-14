@@ -1,5 +1,6 @@
 import StatCard from "../components/StatCard";
 import AdjustStockForm from "../forms/AdjustStockForm";
+import PriceHistoryPanel from "../components/PriceHistoryPanel";
 function StockItemDetailView({
                                  item,
                                  movements,
@@ -62,7 +63,10 @@ function StockItemDetailView({
           description="Suggested reorder amount"
         />
       </section>
-
+        <div className="detail-section">
+            <h3>Price History</h3>
+            <PriceHistoryPanel item={item} />
+        </div>
       <div className="detail-section">
         <h3>Movement History</h3>
 

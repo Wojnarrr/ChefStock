@@ -27,7 +27,22 @@ const restaurantSchema = new mongoose.Schema(
             unique: true,
             default: generateJoinCode,
         },
+        // VAT included in menu prices, as a percentage (e.g. 13.5).
+        // null = not set yet; food cost % then uses the price including VAT.
+        vatRate: {
+            type: Number,
+            default: null,
+            min: [0, "VAT rate can't be negative"],
+            max: [100, "VAT rate can't be over 100%"],
+        },
 
+        // The food cost % the owner aims for; menu items above it are flagged.
+        targetFoodCostPercent: {
+            type: Number,
+            default: 30,
+            min: [1, "Target must be at least 1%"],
+            max: [100, "Target can't be over 100%"],
+        },
         isActive: {
             type: Boolean,
             default: true,

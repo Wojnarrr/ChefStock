@@ -37,6 +37,14 @@ const deliveryItemSchema = new mongoose.Schema(
             default: "",
         },
 
+        // What you paid per stock unit (e.g. per case), excluding VAT.
+        // null means "not entered", which is different from free (0).
+        unitCost: {
+            type: Number,
+            default: null,
+            min: 0,
+        },
+
         expiryDate: {
             type: Date,
             default: null,

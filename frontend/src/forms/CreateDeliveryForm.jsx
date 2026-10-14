@@ -1,4 +1,11 @@
 import { useState } from "react";
+import { formatEuro } from "../utils/format";
+// Cost of one line on the invoice. You pay for what you accepted, not what
+// arrived (rejected items get credited). Returns null if no price was entered.
+const getLineTotal = (item) => {
+  if (item.unitCost === "") return null;
+  return Number(item.unitCost) * Number(item.quantityAccepted || 0);
+};
 
 function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
   const createEmptyDeliveryItem = () => ({
@@ -9,6 +16,7 @@ function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
     expiryDate: "",
     issueType: "none",
     issueNotes: "",
+    unitCost: "",
   });
 
   const [formData, setFormData] = useState({
@@ -68,6 +76,9 @@ function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
       };
     });
   };
+
+  const lineTotals = formData.items.map(getLineTotal).filter((total) => total !== null);
+  const deliveryTotal = lineTotals.reduce((sum, total) => sum + total, 0);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -198,6 +209,24 @@ function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
                   </label>
 
                   <label>
+                    Cost per {selectedStockItem?.stockUnit || "unit"} (€, ex VAT)
+                    <input
+                        name="unitCost"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={deliveryItem.unitCost}
+                        onChange={(event) => handleItemChange(index, event)}
+                        placeholder="Optional"
+                    />
+                    {getLineTotal(deliveryItem) !== null && (
+                        <span className="field-hint">
+                        Line total: {formatEuro(getLineTotal(deliveryItem))}
+                      </span>
+                    )}
+                  </label>
+
+                  <label>
                     Batch Number
                     <input
                       name="batchNumber"
@@ -248,7 +277,11 @@ function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
             );
           })}
         </div>
-
+        {lineTotals.length > 0 && (
+            <p className="delivery-total">
+              Delivery total (ex VAT): <strong>{formatEuro(deliveryTotal)}</strong>
+            </p>
+        )}
         <label className="full-width-label">
           Delivery Notes
           <textarea

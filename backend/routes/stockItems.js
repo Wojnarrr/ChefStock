@@ -6,6 +6,7 @@ const {
     updateStockItem,
     deleteStockItem,
     getLowStockItems,
+    getPriceHistory,
 } = require("../controllers/stockItemController");
 const { protect, attachRestaurantContext } = require("../middleware/auth");
 const requireOwner = require("../middleware/requireOwner");
@@ -17,6 +18,8 @@ router.use(protect, attachRestaurantContext);
 router.route("/").get(getStockItems).post(requireOwner, createStockItem);
 
 router.get("/low-stock", getLowStockItems);
+
+router.get("/:id/price-history", getPriceHistory);
 
 router
     .route("/:id")

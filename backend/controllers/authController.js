@@ -7,11 +7,11 @@ const generateToken = require("../utils/generateToken");
 const getMembershipsForUser = async (userId) => {
     const memberships = await RestaurantMembership.find({ user: userId }).populate(
         "restaurant",
-        "name address joinCode isActive"
+        "name address joinCode isActive vatRate targetFoodCostPercent"
     );
 
     return memberships.map((membership) => {
-        const { _id, name, address, isActive, joinCode } = membership.restaurant;
+        const { _id, name, address, isActive, joinCode, vatRate, targetFoodCostPercent} = membership.restaurant;
 
         return {
             restaurant: {
@@ -19,6 +19,8 @@ const getMembershipsForUser = async (userId) => {
                 name,
                 address,
                 isActive,
+                vatRate,
+                targetFoodCostPercent,
                 // Only owners should see the invite code.
                 ...(membership.role === "owner" && { joinCode }),
             },

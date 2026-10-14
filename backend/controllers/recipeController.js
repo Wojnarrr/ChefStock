@@ -1,4 +1,5 @@
 const Recipe = require("../models/Recipe");
+const createCostCalculator = require("../utils/createCostCalculator");
 
 const getRecipes = async (req, res) => {
     try {
@@ -105,11 +106,45 @@ const deleteRecipe = async (req, res) => {
         });
     }
 };
+// GET /api/recipes/costs
+// What every recipe costs right now, based on the latest delivery prices.
+const getRecipeCosts = async (req, res) => {
+    try {
+        // Full stock items this time (not just the name): costing needs
+        // lastUnitCost and unitsPerStockUnit.
+        const recipes = await Recipe.find({ isActive: true, restaurant: req.restaurantId })
+            .populate("ingredients.stockItem")
+            .sort({ name: 1 });
 
+        const calculator = createCostCalculator(recipes);
+
+        const costs = recipes.map((recipe) => {
+            const batch = calculator.getRecipeCost(recipe);
+            const perPortion = recipe.portionsPerOutput
+                ? calculator.getCostPerPortion(recipe).cost
+                : null;
+
+            return {
+                recipeId: recipe._id,
+                name: recipe.name,
+                recipeType: recipe.recipeType,
+                batchCost: batch.cost, // one tray, or one prep batch
+                costPerPortion: perPortion, // one slice (production recipes only)
+                missing: batch.missing,
+                isComplete: batch.missing.length === 0,
+            };
+        });
+
+        res.status(200).json(costs);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to calculate recipe costs", error: error.message });
+    }
+};
 module.exports = {
     getRecipes,
     getRecipeById,
     createRecipe,
     updateRecipe,
     deleteRecipe,
+    getRecipeCosts,
 };

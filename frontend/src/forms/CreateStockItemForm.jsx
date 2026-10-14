@@ -1,73 +1,114 @@
 import { useState } from "react";
 import { STOCK_UNIT_OPTIONS } from "../constants/options";
 
-function CreateStockItemForm({ editingStockItem, onSubmit, onCancel }) {
+const CATEGORY_OPTIONS = [
+  { value: "ingredient", label: "Ingredient" },
+  { value: "drink", label: "Drink" },
+  { value: "packaging", label: "Packaging" },
+  { value: "other", label: "Other" },
+];
+
+// Saved item -> the strings the inputs need (or a blank form).
+const toFormState = (item) =>
+    item
+        ? {
+          name: item.name,
+          category: item.category,
+          madeInHouse: item.stockType === "prepared",
+          stockUnit: item.stockUnit,
+          recipeUnit: item.recipeUnit,
+          // Older items may only have the "estimated" number; use it so nothing is lost.
+          unitsPerStockUnit: String(item.unitsPerStockUnit ?? item.estimatedUnitsPerStockUnit ?? ""),
+          currentStock: "0",
+          minStockLevel: String(item.minStockLevel ?? 0),
+          reorderQuantity: String(item.reorderQuantity ?? 0),
+          preferredSupplier: item.preferredSupplier?._id ?? item.preferredSupplier ?? "",
+        }
+        : {
+          name: "",
+          category: "ingredient",
+          madeInHouse: false,
+          stockUnit: "case",
+          recipeUnit: "case",
+          unitsPerStockUnit: "",
+          currentStock: "0",
+          minStockLevel: "0",
+          reorderQuantity: "0",
+          preferredSupplier: "",
+        };
+
+function CreateStockItemForm({ editingStockItem, suppliers = [], onSubmit, onCancel }) {
   const isEditing = Boolean(editingStockItem);
 
-  const [formData, setFormData] = useState(() =>
-      editingStockItem
-          ? {
-            name: editingStockItem.name,
-            category: editingStockItem.category,
-            stockType: editingStockItem.stockType,
-            stockUnit: editingStockItem.stockUnit,
-            recipeUnit: editingStockItem.recipeUnit,
-            packType: editingStockItem.packType,
-            unitsPerStockUnit:
-                editingStockItem.unitsPerStockUnit === null || editingStockItem.unitsPerStockUnit === undefined
-                    ? ""
-                    : String(editingStockItem.unitsPerStockUnit),
-            estimatedUnitsPerStockUnit:
-                editingStockItem.estimatedUnitsPerStockUnit === null || editingStockItem.estimatedUnitsPerStockUnit === undefined
-                    ? ""
-                    : String(editingStockItem.estimatedUnitsPerStockUnit),
-            minStockLevel: String(editingStockItem.minStockLevel),
-            reorderQuantity: String(editingStockItem.reorderQuantity),
-            trackingPriority: editingStockItem.trackingPriority,
-            requiresExpiryTracking: editingStockItem.requiresExpiryTracking,
-            requiresBatchTracking: editingStockItem.requiresBatchTracking,
-          }
-          : {
-            name: "",
-            category: "ingredient",
-            stockType: "raw",
-            stockUnit: "pack",
-            recipeUnit: "g",
-            packType: "none",
-            unitsPerStockUnit: "",
-            estimatedUnitsPerStockUnit: "",
-            currentStock: "0",
-            minStockLevel: "0",
-            reorderQuantity: "0",
-            trackingPriority: "medium",
-            requiresExpiryTracking: false,
-            requiresBatchTracking: false,
-          }
-  );
+  const [form, setForm] = useState(() => toFormState(editingStockItem));
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Only ask for the conversion when the two units are different.
+  const needsConversion = form.stockUnit !== form.recipeUnit;
 
   const handleChange = (event) => {
-    const { name, value, type, checked } = event.target;
+    const { name, value } = event.target;
+    setError("");
 
-    setFormData((currentFormData) => ({
-      ...currentFormData,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+
+      // Most items are used in the same unit they're counted in, so the recipe
+      // unit follows the stock unit until someone changes it on purpose.
+      if (name === "stockUnit" && current.recipeUnit === current.stockUnit) {
+        next.recipeUnit = value;
+      }
+
+      return next;
+    });
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    onSubmit(formData);
+
+    try {
+      setError("");
+      setSaving(true);
+
+      // Keep old "finished product" / "non-edible" types unless it's now made in house.
+      const boughtInType =
+          editingStockItem && editingStockItem.stockType !== "prepared" ? editingStockItem.stockType : "raw";
+
+      const payload = {
+        name: form.name,
+        category: form.category,
+        stockType: form.madeInHouse ? "prepared" : boughtInType,
+        stockUnit: form.stockUnit,
+        recipeUnit: form.recipeUnit,
+        unitsPerStockUnit: needsConversion ? Number(form.unitsPerStockUnit) : null,
+        minStockLevel: Number(form.minStockLevel),
+        reorderQuantity: Number(form.reorderQuantity),
+        preferredSupplier: form.preferredSupplier || null,
+      };
+
+      // The starting amount is only set when creating; after that, stock
+      // changes through deliveries, prep and Adjust Stock.
+      if (!isEditing) {
+        payload.currentStock = Number(form.currentStock);
+      }
+
+      await onSubmit(payload);
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
   };
 
   return (
       <section className="panel form-panel">
         <div className="panel-header">
           <div>
-            <h2>{isEditing ? "Edit Stock Item" : "Add Stock Item"}</h2>
+            <h2>{isEditing ? `Edit ${editingStockItem.name}` : "Add stock item"}</h2>
             <p className="panel-subtitle">
               {isEditing
-                  ? "Update this item's details. Use Adjust Stock on its detail page to change the stock count."
-                  : "Create a new item that can be used in deliveries, prep, and recipes."}
+                  ? "To change how much you have, use Adjust Stock on the item's page."
+                  : "Anything you buy or make: ingredients, drinks, packaging."}
             </p>
           </div>
         </div>
@@ -76,184 +117,147 @@ function CreateStockItemForm({ editingStockItem, onSubmit, onCancel }) {
           <div className="form-grid">
             <label>
               Name
-              <input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="e.g. Garlic Dip"
-                  required
-              />
+              <input name="name" value={form.name} onChange={handleChange} placeholder="e.g. Mozzarella" required />
             </label>
 
             <label>
               Category
-              <select name="category" value={formData.category} onChange={handleChange}>
-                <option value="ingredient">Ingredient</option>
-                <option value="drink">Drink</option>
-                <option value="packaging">Packaging</option>
-                <option value="other">Other</option>
+              <select name="category" value={form.category} onChange={handleChange}>
+                {CATEGORY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                ))}
               </select>
+            </label>
+          </div>
+
+          <fieldset className="choice-group">
+            <legend>Where does it come from?</legend>
+            <label className={`choice ${!form.madeInHouse ? "active" : ""}`}>
+              <input
+                  type="radio"
+                  name="madeInHouse"
+                  checked={!form.madeInHouse}
+                  onChange={() => setForm({ ...form, madeInHouse: false })}
+              />
+              <span>
+              <strong>Bought in</strong>
+              <small>Comes on a delivery</small>
+            </span>
+            </label>
+            <label className={`choice ${form.madeInHouse ? "active" : ""}`}>
+              <input
+                  type="radio"
+                  name="madeInHouse"
+                  checked={form.madeInHouse}
+                  onChange={() => setForm({ ...form, madeInHouse: true })}
+              />
+              <span>
+              <strong>Made in house</strong>
+              <small>Made by a prep recipe, e.g. sauce, dough</small>
+            </span>
+            </label>
+          </fieldset>
+
+          <div className="form-grid">
+            <label>
+              You count it in
+              <select name="stockUnit" value={form.stockUnit} onChange={handleChange}>
+                {STOCK_UNIT_OPTIONS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                ))}
+              </select>
+              <span className="field-hint">How it arrives and how you count it: case, box, can…</span>
             </label>
 
             <label>
-              Stock Type
-              <select name="stockType" value={formData.stockType} onChange={handleChange}>
-                <option value="raw">Raw</option>
-                <option value="prepared">Prepared</option>
-                <option value="finished_product">Finished Product</option>
-                <option value="non_edible">Non Edible</option>
+              Recipes use it in
+              <select name="recipeUnit" value={form.recipeUnit} onChange={handleChange}>
+                {STOCK_UNIT_OPTIONS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                ))}
               </select>
+              <span className="field-hint">e.g. grams of cheese on a pizza</span>
             </label>
 
-            <label>
-              Stock Unit
-              <select name="stockUnit" value={formData.stockUnit} onChange={handleChange}>
-                <UnitOptions />
-              </select>
-            </label>
-
-            <label>
-              Recipe Unit
-              <select name="recipeUnit" value={formData.recipeUnit} onChange={handleChange}>
-                <UnitOptions />
-              </select>
-            </label>
-
-            <label>
-              Pack Type
-              <select name="packType" value={formData.packType} onChange={handleChange}>
-                <option value="none">None</option>
-                <option value="fixed">Fixed</option>
-                <option value="variable">Variable</option>
-              </select>
-            </label>
-
-            {formData.packType === "fixed" && (
+            {needsConversion && (
                 <label>
-                  Units Per Stock Unit
+                  How many {form.recipeUnit} in one {form.stockUnit}?
                   <input
                       name="unitsPerStockUnit"
                       type="number"
-                      step="0.001"
-                      value={formData.unitsPerStockUnit}
+                      step="any"
+                      min="0.001"
+                      value={form.unitsPerStockUnit}
                       onChange={handleChange}
-                      placeholder="e.g. 1500"
+                      placeholder="e.g. 10000"
                       required
                   />
+                  <span className="field-hint">An average is fine. If it varies, use what you usually get.</span>
                 </label>
             )}
 
-            {formData.packType === "variable" && (
-                <label>
-                  Estimated Units Per Stock Unit
-                  <input
-                      name="estimatedUnitsPerStockUnit"
-                      type="number"
-                      step="0.001"
-                      value={formData.estimatedUnitsPerStockUnit}
-                      onChange={handleChange}
-                      placeholder="e.g. 10"
-                      required
-                  />
-                </label>
-            )}
+            <label>
+              Warn me when below
+              <span className="input-with-unit">
+              <input name="minStockLevel" type="number" step="any" min="0" value={form.minStockLevel} onChange={handleChange} required />
+              <span>{form.stockUnit}</span>
+            </span>
+            </label>
 
             {!isEditing && (
                 <label>
-                  Current Stock
-                  <input
-                      name="currentStock"
-                      type="number"
-                      step="0.001"
-                      value={formData.currentStock}
-                      onChange={handleChange}
-                      required
-                  />
+                  Stock on hand now
+                  <span className="input-with-unit">
+                <input name="currentStock" type="number" step="any" min="0" value={form.currentStock} onChange={handleChange} />
+                <span>{form.stockUnit}</span>
+              </span>
                 </label>
             )}
-
-            <label>
-              Minimum Stock Level
-              <input
-                  name="minStockLevel"
-                  type="number"
-                  step="0.001"
-                  value={formData.minStockLevel}
-                  onChange={handleChange}
-                  required
-              />
-            </label>
-
-            <label>
-              Reorder Quantity
-              <input
-                  name="reorderQuantity"
-                  type="number"
-                  step="0.001"
-                  value={formData.reorderQuantity}
-                  onChange={handleChange}
-                  required
-              />
-            </label>
-
-            <label>
-              Tracking Priority
-              <select
-                  name="trackingPriority"
-                  value={formData.trackingPriority}
-                  onChange={handleChange}
-              >
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </label>
           </div>
 
-          <div className="checkbox-row">
-            <label>
-              <input
-                  type="checkbox"
-                  name="requiresExpiryTracking"
-                  checked={formData.requiresExpiryTracking}
-                  onChange={handleChange}
-              />
-              Requires expiry tracking
-            </label>
+          <details className="more-options">
+            <summary>More options</summary>
+            <div className="form-grid">
+              <label>
+                Preferred supplier
+                <select name="preferredSupplier" value={form.preferredSupplier} onChange={handleChange}>
+                  <option value="">None</option>
+                  {suppliers.map((supplier) => (
+                      <option key={supplier._id} value={supplier._id}>
+                        {supplier.name}
+                      </option>
+                  ))}
+                </select>
+              </label>
 
-            <label>
-              <input
-                  type="checkbox"
-                  name="requiresBatchTracking"
-                  checked={formData.requiresBatchTracking}
-                  onChange={handleChange}
-              />
-              Requires batch tracking
-            </label>
-          </div>
+              <label>
+                Usual order amount
+                <span className="input-with-unit">
+                <input name="reorderQuantity" type="number" step="any" min="0" value={form.reorderQuantity} onChange={handleChange} />
+                <span>{form.stockUnit}</span>
+              </span>
+              </label>
+            </div>
+          </details>
+
+          {error && <p className="error">{error}</p>}
 
           <div className="form-actions">
             <button type="button" className="secondary-button" onClick={onCancel}>
               Cancel
             </button>
-            <button type="submit" className="primary-button">
-              {isEditing ? "Save Changes" : "Create Stock Item"}
+            <button type="submit" className="primary-button" disabled={saving}>
+              {saving ? "Saving..." : isEditing ? "Save changes" : "Create stock item"}
             </button>
           </div>
         </form>
       </section>
-  );
-}
-
-function UnitOptions() {
-  return (
-      <>
-        {STOCK_UNIT_OPTIONS.map((unit) => (
-            <option key={unit} value={unit}>
-              {unit}
-            </option>
-        ))}
-      </>
   );
 }
 

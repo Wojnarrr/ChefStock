@@ -40,6 +40,12 @@ const PATHS = {
       <path d="M9 8h6M9 11h4" />
     </>
   ),
+    tag: (
+        <>
+            <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9Z" />
+            <circle cx="7.5" cy="7.5" r="1.5" />
+        </>
+    ),
   prep: (
     <>
       <rect x="5" y="4" width="14" height="17" rx="2" />
