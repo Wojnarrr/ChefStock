@@ -22,7 +22,7 @@ import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
 import ManagementView from "./pages/management/ManagementView";
 import AccountView from "./pages/account/AccountView";
 import MenuView from "./pages/menu/MenuView";
-
+import SuppliersPage from "./pages/SuppliersPage.jsx";
 import { getPage, canAccessPage } from "./constants/navigation";
 import { useAuth } from "./context/AuthContext";
 
@@ -562,24 +562,7 @@ function App() {
             </div>
         )}
 
-        {activePage === "suppliers" &&
-            (showCreateSupplierForm ? (
-                <CreateSupplierForm
-                    editingSupplier={editingSupplier}
-                    onSubmit={handleSubmitSupplier}
-                    onCancel={() => {
-                      setShowCreateSupplierForm(false);
-                      setEditingSupplier(null);
-                    }}
-                />
-            ) : (
-                <SuppliersView
-                    suppliers={suppliers}
-                    onAddSupplier={() => setShowCreateSupplierForm(true)}
-                    onEditSupplier={handleEditSupplierClick}
-                    onDeleteSupplier={handleDeleteSupplier}
-                />
-            ))}
+        {activePage === "suppliers" && <SuppliersPage />}
 
         {activePage === "recipes" && (
             <div className="page-stack">

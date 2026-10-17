@@ -4,7 +4,6 @@ import { useSubmit } from "../hooks/useSubmit";
 // Today as "YYYY-MM-DD" in the user's own timezone (toISOString would use UTC,
 // which gives yesterday's date just after midnight in Ireland).
 const getToday = () => new Date().toLocaleDateString("en-CA");
-const { submit, error, saving } = useSubmit(onSubmit);
 
 const ISSUE_OPTIONS = [
   { value: "damaged", label: "Damaged" },
@@ -41,6 +40,7 @@ function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
     notes: "",
     items: [createEmptyLine()],
   });
+  const { submit, error, saving } = useSubmit(onSubmit);
 
   const findStockItem = (id) => stockItems.find((item) => item._id === id);
 
