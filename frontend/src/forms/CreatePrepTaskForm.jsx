@@ -34,7 +34,16 @@ function CreatePrepTaskForm({ recipes, onSubmit, onCancel }) {
 
     const handleSubmit = (event) => {
         event.preventDefault();
-        submit(formData);
+
+        submit({
+            taskName: formData.taskName,
+            // "" means "No recipe" in the dropdown; the database needs null for that.
+            linkedRecipe: formData.linkedRecipe || null,
+            targetQuantity: formData.linkedRecipe ? Number(formData.targetQuantity) : null,
+            assignedTo: formData.assignedTo,
+            dueTime: formData.dueTime,
+            notes: formData.notes,
+        });
     };
 
     const selectedRecipe = prepRecipes.find(

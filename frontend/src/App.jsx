@@ -8,19 +8,15 @@ import ComingSoonView from "./components/ComingSoonView";
 import DashboardView from "./pages/DashboardView";
 import StockItemsView from "./pages/StockItemsView";
 import StockItemDetailView from "./pages/StockItemDetailView";
-import RecipesView from "./pages/RecipesView";
-import ProductionView from "./pages/ProductionBatchesView.jsx";
-import PrepTasksView from "./pages/PrepTasksView";
-import CreatePrepTaskForm from "./forms/CreatePrepTaskForm";
 import CreateStockItemForm from "./forms/CreateStockItemForm";
-import CreateRecipeForm from "./forms/CreateRecipeForm";
-import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
 import ManagementView from "./pages/management/ManagementView";
 import AccountView from "./pages/account/AccountView";
 import MenuView from "./pages/menu/MenuView";
 import SuppliersPage from "./pages/SuppliersPage.jsx";
 import DeliveriesPage from "./pages/DeliveriesPage.jsx";
 import RecipesPage from "./pages/RecipesPage.jsx";
+import PrepTasksPage from "./pages/PrepTasksPage.jsx";
+import ProductionPage from "./pages/ProductionPage.jsx";
 
 import { getPage, canAccessPage } from "./constants/navigation";
 import { useAuth } from "./context/AuthContext";
@@ -38,13 +34,7 @@ function App() {
   const [selectedItemMovements, setSelectedItemMovements] = useState([]);
   const [movementsLoading, setMovementsLoading] = useState(false);
   const [showCreateStockItemForm, setShowCreateStockItemForm] = useState(false);
-  const [productionBatches, setProductionBatches] = useState([]);
-  const [recipes, setRecipes] = useState([]);
   const [editingRecipe, setEditingRecipe] = useState(null);
-  const [showCreateRecipeForm, setShowCreateRecipeForm] = useState(false);
-  const [showCreateProductionBatchForm, setShowCreateProductionBatchForm] = useState(false);
-  const [prepTasks, setPrepTasks] = useState([]);
-  const [showCreatePrepTaskForm, setShowCreatePrepTaskForm] = useState(false);
   const [showAdjustStockForm, setShowAdjustStockForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -66,9 +56,6 @@ function App() {
           dashboardData,
           stockItemsData,
           suppliersData,
-          recipesData,
-          productionBatchesData,
-          prepTasksData,
         ] = await Promise.all([
           apiFetch("/dashboard/summary"),
           apiFetch("/stock-items"),
@@ -78,13 +65,10 @@ function App() {
           apiFetch("/production-batches"),
           apiFetch("/prep-tasks"),
         ]);
-
         setDashboard(dashboardData);
         setStockItems(stockItemsData);
         setSuppliers(suppliersData);
-        setRecipes(recipesData);
-        setProductionBatches(productionBatchesData);
-        setPrepTasks(prepTasksData);
+
       } catch (error) {
         setError(error.message);
       } finally {
@@ -131,9 +115,6 @@ function App() {
   const handleNavigate = (page) => {
     setActivePage(page);
     setSelectedStockItem(null);
-    setShowCreateRecipeForm(false);
-    setShowCreateProductionBatchForm(false);
-    setShowCreatePrepTaskForm(false);
     setEditingRecipe(null);
     setEditingStockItem(null);
     if (page !== "stock-items") {
@@ -151,20 +132,6 @@ function App() {
     const data = await apiFetch("/dashboard/summary");
     setDashboard(data);
   };
-
-  const refreshRecipes = async () => {
-    const data = await apiFetch("/recipes");
-    setRecipes(data);
-  };
-  const refreshProductionBatches = async () => {
-    const data = await apiFetch("/production-batches");
-    setProductionBatches(data);
-  };
-  const refreshPrepTasks = async () => {
-    const data = await apiFetch("/prep-tasks");
-    setPrepTasks(data);
-  };
-
 
   const handleEditStockItemClick = (item) => {
     setEditingStockItem(item);
@@ -207,12 +174,6 @@ function App() {
     setEditingStockItem(null);
   };
 
-
-  const handleEditRecipeClick = (recipe) => {
-    setEditingRecipe(recipe);
-    setShowCreateRecipeForm(true);
-  };
-
   const handleUpdateRecipe = async (recipeId, payload) => {
     await apiFetch(`/recipes/${recipeId}`, {
       method: "PUT",
@@ -222,118 +183,6 @@ function App() {
     await refreshRecipes();
   };
 
-  const handleDeleteRecipe = async (recipe) => {
-    const confirmed = window.confirm(`Delete recipe "${recipe.name}"?`);
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await apiFetch(`/recipes/${recipe._id}`, { method: "DELETE" });
-      await refreshRecipes();
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleSubmitRecipe = async (formData) => {
-      const isPrep = formData.recipeType === "prep";
-      const outputItem = stockItems.find((item) => item._id === formData.outputStockItem);
-
-      const payload = {
-        name: formData.name,
-        recipeType: formData.recipeType,
-        // Prep output is added straight onto the item's stock, so it has to
-        // be in that item's stock unit.
-        outputUnit: isPrep ? outputItem.stockUnit : formData.outputUnit,
-        portionsPerOutput:
-            !isPrep && formData.portionsPerOutput !== "" ? Number(formData.portionsPerOutput) : null,
-        outputStockItem: isPrep ? formData.outputStockItem : null,
-        outputQuantity: isPrep ? Number(formData.outputQuantity) : null,
-        ingredients: formData.ingredients.map((ingredient) => {
-          const stockItem = stockItems.find((item) => item._id === ingredient.stockItem);
-
-          return {
-            stockItem: ingredient.stockItem,
-            quantity: Number(ingredient.quantity),
-            // Always the item's own recipe unit: that's what the backend converts from.
-            unit: stockItem.recipeUnit || stockItem.stockUnit,
-            isOptional: ingredient.isOptional,
-          };
-        }),
-        notes: formData.notes,
-        isActive: true,
-      };
-
-      if (editingRecipe) {
-        await handleUpdateRecipe(editingRecipe._id, payload);
-      } else {
-        await apiFetch("/recipes", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-        await refreshRecipes();
-      }
-
-      setShowCreateRecipeForm(false);
-      setEditingRecipe(null);
-
-  };
-  const handleCreateProductionBatch = async (formData) => {
-      const payload = {
-        itemsProduced: formData.itemsProduced.map((item) => ({
-          recipe: item.recipe,
-          quantityProduced: Number(item.quantityProduced),
-          outputUnit: item.outputUnit,
-        })),
-        notes: formData.notes,
-      };
-
-      const data = await apiFetch("/production-batches", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      if (data.stockWarnings && data.stockWarnings.length > 0) {
-        const warningText = data.stockWarnings.map((w) => w.message).join("\n");
-        alert(`Production recorded, but some stock looks off:\n\n${warningText}`);
-      }
-
-      await refreshDashboard();
-      await refreshStockItems();
-      await refreshProductionBatches();
-
-      setShowCreateProductionBatchForm(false);
-
-  };
-  const handleCreatePrepTask = async (formData) => {
-      await apiFetch("/prep-tasks", {
-        method: "POST",
-        body: JSON.stringify(formData),
-      });
-
-      await refreshPrepTasks();
-      setShowCreatePrepTaskForm(false);
-  };
-  const handleCompleteTask = async (taskId) => {
-    try {
-      const data = await apiFetch(`/prep-tasks/${taskId}/complete`, {
-        method: "PATCH",
-      });
-
-      if (data.stockWarnings && data.stockWarnings.length > 0) {
-        const warningText = data.stockWarnings.map((w) => w.message).join("\n");
-        alert(`Task completed, but some stock looks off:\n\n${warningText}`);
-      }
-
-      await refreshDashboard();
-      await refreshStockItems();
-      await refreshPrepTasks();
-    } catch (error) {
-      setError(error.message);
-    }
-  };
   const handleCreateStockAdjustment = async (payload) => {
 
       await apiFetch("/stock-adjustments", {
@@ -427,39 +276,10 @@ function App() {
             ))}
 
         {activePage === "deliveries" && <DeliveriesPage />}
-
         {activePage === "suppliers" && <SuppliersPage />}
-
         {activePage === "recipes" && <RecipesPage />}
-
-        {activePage === "prep" &&
-            (showCreatePrepTaskForm ? (
-                <CreatePrepTaskForm
-                    recipes={recipes}
-                    onSubmit={handleCreatePrepTask}
-                    onCancel={() => setShowCreatePrepTaskForm(false)}
-                />
-            ) : (
-                <PrepTasksView
-                    prepTasks={prepTasks}
-                    onAddPrepTask={() => setShowCreatePrepTaskForm(true)}
-                    onCompleteTask={handleCompleteTask}
-                />
-            ))}
-
-        {activePage === "production" &&
-            (showCreateProductionBatchForm ? (
-                <CreateProductionBatchForm
-                    recipes={recipes}
-                    onSubmit={handleCreateProductionBatch}
-                    onCancel={() => setShowCreateProductionBatchForm(false)}
-                />
-            ) : (
-                <ProductionView
-                    productionBatches={productionBatches}
-                    onAddProductionBatch={() => setShowCreateProductionBatchForm(true)}
-                />
-            ))}
+        {activePage === "prep" && <PrepTasksPage />}
+        {activePage === "production" && <ProductionPage />}
         {activePage === "management" && <ManagementView />}
         {activePage === "account" && <AccountView />}
         {activePage === "menu" && <MenuView key={currentRestaurantId} />}
