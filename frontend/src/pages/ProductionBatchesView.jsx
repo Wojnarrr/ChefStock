@@ -1,4 +1,18 @@
+import { useTableControls } from "../hooks/useTableControls";
+import { TableControls, Pagination } from "../components/TableControls";
+import { formatDate } from "../utils/format";
+
+const newest = (a, b) => new Date(b.productionDate) - new Date(a.productionDate);
+
 function ProductionView({ productionBatches, onAddProductionBatch }) {
+    const controls = useTableControls(productionBatches, {
+        getSearchText: (batch) =>
+            [batch.notes, ...batch.itemsProduced.map((item) => item.recipe?.name)].join(" "),
+        sortOptions: {
+            newest: { label: "Newest first", compare: newest },
+            oldest: { label: "Oldest first", compare: (a, b) => newest(b, a) },
+        },
+    });
     return (
         <section className="panel stock-table-panel">
             <div className="panel-header">
@@ -16,7 +30,7 @@ function ProductionView({ productionBatches, onAddProductionBatch }) {
                     </button>
                 </div>
             </div>
-
+            <TableControls controls={controls} placeholder="..." />
             {productionBatches.length === 0 ? (
                 <p className="muted">No production recorded yet.</p>
             ) : (
@@ -31,9 +45,9 @@ function ProductionView({ productionBatches, onAddProductionBatch }) {
                         </thead>
 
                         <tbody>
-                        {productionBatches.map((batch) => (
+                        {controls.rows.map((batch) => (
                             <tr key={batch._id}>
-                                <td>{new Date(batch.productionDate).toLocaleDateString()}</td>
+                                <td>{formatDate(batch.productionDate)}</td>
 
                                 <td>
                                     {batch.itemsProduced.map((item, index) => (
@@ -51,6 +65,7 @@ function ProductionView({ productionBatches, onAddProductionBatch }) {
                     </table>
                 </div>
             )}
+            <Pagination controls={controls} />
         </section>
     );
 }

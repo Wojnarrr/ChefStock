@@ -1,4 +1,22 @@
+import { useTableControls } from "../hooks/useTableControls";
+import { TableControls, Pagination } from "../components/TableControls";
+import { formatDate } from "../utils/format";
+
+const newest = (a, b) => new Date(b.deliveryDate) - new Date(a.deliveryDate);
+
 function DeliveriesView({ deliveries, onAddDelivery }) {
+  const controls = useTableControls(deliveries, {
+    getSearchText: (delivery) =>
+        [
+          delivery.supplier?.name,
+          delivery.invoiceNumber,
+          ...delivery.items.map((item) => item.stockItem?.name),
+        ].join(" "),
+    sortOptions: {
+      newest: { label: "Newest first", compare: newest },
+      oldest: { label: "Oldest first", compare: (a, b) => newest(b, a) },
+    },
+  });
   return (
     <section className="panel stock-table-panel">
       <div className="panel-header">
@@ -16,7 +34,7 @@ function DeliveriesView({ deliveries, onAddDelivery }) {
           </button>
         </div>
       </div>
-
+      <TableControls controls={controls} placeholder="..." />
       <div className="table-wrapper">
         <table className="stock-table">
           <thead>
@@ -30,9 +48,9 @@ function DeliveriesView({ deliveries, onAddDelivery }) {
           </thead>
 
           <tbody>
-            {deliveries.map((delivery) => (
+            {controls.rows.map((delivery) => (
               <tr key={delivery._id}>
-                <td>{new Date(delivery.deliveryDate).toLocaleDateString()}</td>
+                <td>{formatDate(delivery.deliveryDate)}</td>
                 <td>{delivery.supplier?.name || "Unknown supplier"}</td>
                 <td>{delivery.invoiceNumber || "—"}</td>
                 <td>
@@ -49,8 +67,10 @@ function DeliveriesView({ deliveries, onAddDelivery }) {
           </tbody>
         </table>
       </div>
+      <Pagination controls={controls} />
     </section>
   );
+
 }
 
 export default DeliveriesView;

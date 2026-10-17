@@ -9,9 +9,13 @@ const roundStock = require("../utils/roundStock");
 
 const getPrepTasks = async (req, res) => {
     try {
-        const prepTasks = await PrepTask.find({ restaurant: req.restaurantId })
-            .populate("linkedRecipe", "name outputUnit outputQuantity")
-            .sort({ prepDate: 1, createdAt: 1 });
+        // Open tasks always, finished ones only from the last 2 weeks.
+        const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+        const prepTasks = await PrepTask.find({
+            restaurant: req.restaurantId,
+            $or: [{ status: { $ne: "done" } }, { completedAt: { $gte: twoWeeksAgo } }],
+        })
 
         res.status(200).json(prepTasks);
     } catch (error) {

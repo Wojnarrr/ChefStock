@@ -1,4 +1,13 @@
+import { useTableControls } from "../hooks/useTableControls";
+import { TableControls, Pagination } from "../components/TableControls";
 function SuppliersView({ suppliers, onAddSupplier, onEditSupplier, onDeleteSupplier }) {
+
+  const controls = useTableControls(suppliers, {
+    getSearchText: (supplier) => `${supplier.name} ${supplier.contactPerson ?? ""}`,
+    sortOptions: {
+      name: { label: "Name A–Z", compare: (a, b) => a.name.localeCompare(b.name) },
+    },
+  });
   return (
     <section className="panel stock-table-panel">
       <div className="panel-header">
@@ -16,7 +25,7 @@ function SuppliersView({ suppliers, onAddSupplier, onEditSupplier, onDeleteSuppl
           </button>
         </div>
       </div>
-
+      <TableControls controls={controls} placeholder="..." />
       {suppliers.length === 0 ? (
         <p className="muted">No suppliers added yet.</p>
       ) : (
@@ -35,7 +44,7 @@ function SuppliersView({ suppliers, onAddSupplier, onEditSupplier, onDeleteSuppl
             </thead>
 
             <tbody>
-            {suppliers.map((supplier) => (
+            {controls.rows.map((supplier) => (
                 <tr key={supplier._id}>
                   <td><strong>{supplier.name}</strong></td>
                   <td>{supplier.contactPerson || "—"}</td>
@@ -57,6 +66,7 @@ function SuppliersView({ suppliers, onAddSupplier, onEditSupplier, onDeleteSuppl
           </table>
         </div>
       )}
+      <Pagination controls={controls} />
     </section>
   );
 }

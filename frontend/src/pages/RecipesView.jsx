@@ -1,8 +1,27 @@
 import {useAuth} from "../context/AuthContext.jsx";
+import { useTableControls } from "../hooks/useTableControls";
+import { TableControls, Pagination } from "../components/TableControls";
+
+const byName = (a, b) => a.name.localeCompare(b.name);
 
 function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
   const {role} = useAuth()
   const isOwner = role === 'owner';
+  const controls = useTableControls(recipes, {
+    getSearchText: (recipe) => `${recipe.name} ${recipe.notes ?? ""}`,
+    filters: {
+      all: { label: "All", test: () => true },
+      sell: { label: "Sell", test: (recipe) => recipe.recipeType === "production" },
+      prep: { label: "Prep", test: (recipe) => recipe.recipeType === "prep" },
+    },
+    sortOptions: {
+      name: { label: "Name A–Z", compare: byName },
+      type: {
+        label: "Type",
+        compare: (a, b) => a.recipeType.localeCompare(b.recipeType) || byName(a, b),
+      },
+    },
+  });
   return (
       <section className="panel stock-table-panel">
         <div className="panel-header">
@@ -22,6 +41,7 @@ function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
             )}
           </div>
         </div>
+        <TableControls controls={controls} placeholder="..." />
 
         {recipes.length === 0 ? (
             <p className="muted">No recipes created yet.</p>
@@ -42,7 +62,7 @@ function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
                 </thead>
 
                 <tbody>
-                {recipes.map((recipe) => (
+                {controls.rows.map((recipe) => (
                     <tr key={recipe._id}>
                       <td>
                         <strong>{recipe.name}</strong>
@@ -99,8 +119,12 @@ function RecipesView({ recipes, onAddRecipe, onEditRecipe, onDeleteRecipe }) {
                 ))}
                 </tbody>
               </table>
+
             </div>
         )}
+        {controls.total === 0 && <p className="muted">Nothing matches.</p>}
+        <Pagination controls={controls} />
+
       </section>
   );
 }

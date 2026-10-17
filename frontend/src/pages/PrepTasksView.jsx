@@ -1,3 +1,4 @@
+import {useTableControls} from "../hooks/useTableControls.js";
 function PrepTasksView({ prepTasks, onAddPrepTask, onCompleteTask }) {
     const handleCompleteClick = (task) => {
         if (task.linkedRecipe) {
@@ -12,7 +13,20 @@ function PrepTasksView({ prepTasks, onAddPrepTask, onCompleteTask }) {
 
         onCompleteTask(task._id);
     };
-
+    const controls = useTableControls(prepTasks, {
+        getSearchText: (task) => `${task.taskName} ${task.assignedTo} ${task.linkedRecipe?.name ?? ""}`,
+        filters: {
+            todo: { label: "To do", test: (task) => task.status !== "done" },
+            done: { label: "Done", test: (task) => task.status === "done" },
+        },
+        sortOptions: {
+            added: { label: "Order added", compare: (a, b) => new Date(a.createdAt) - new Date(b.createdAt) },
+            recent: {
+                label: "Most recent",
+                compare: (a, b) => new Date(b.completedAt ?? b.createdAt) - new Date(a.completedAt ?? a.createdAt),
+            },
+        },
+    });
     return (
         <section className="panel stock-table-panel">
             <div className="panel-header">
