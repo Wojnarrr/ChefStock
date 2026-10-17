@@ -8,27 +8,24 @@ import ComingSoonView from "./components/ComingSoonView";
 import DashboardView from "./pages/DashboardView";
 import StockItemsView from "./pages/StockItemsView";
 import StockItemDetailView from "./pages/StockItemDetailView";
-import SuppliersView from "./pages/SuppliersView";
-import DeliveriesView from "./pages/DeliveriesView";
 import RecipesView from "./pages/RecipesView";
 import ProductionView from "./pages/ProductionBatchesView.jsx";
 import PrepTasksView from "./pages/PrepTasksView";
 import CreatePrepTaskForm from "./forms/CreatePrepTaskForm";
 import CreateStockItemForm from "./forms/CreateStockItemForm";
-import CreateSupplierForm from "./forms/CreateSupplierForm";
-import CreateDeliveryForm from "./forms/CreateDeliveryForm";
 import CreateRecipeForm from "./forms/CreateRecipeForm";
 import CreateProductionBatchForm from "./forms/CreateProductionBatchForm";
 import ManagementView from "./pages/management/ManagementView";
 import AccountView from "./pages/account/AccountView";
 import MenuView from "./pages/menu/MenuView";
 import SuppliersPage from "./pages/SuppliersPage.jsx";
+import DeliveriesPage from "./pages/DeliveriesPage.jsx";
+import RecipesPage from "./pages/RecipesPage.jsx";
+
 import { getPage, canAccessPage } from "./constants/navigation";
 import { useAuth } from "./context/AuthContext";
 
 import { apiFetch } from "./utils/api";
-
-// const API_BASE_URL = "http://localhost:5050/api";
 
 function App() {
   const { currentRestaurantId, role } = useAuth();
@@ -36,15 +33,11 @@ function App() {
   const [stockItems, setStockItems] = useState([]);
   const [activePage, setActivePage] = useState("dashboard");
   const [suppliers, setSuppliers] = useState([]);
-  const [deliveries, setDeliveries] = useState([]);
   const [selectedStockItem, setSelectedStockItem] = useState(null);
   const [editingStockItem, setEditingStockItem] = useState(null);
   const [selectedItemMovements, setSelectedItemMovements] = useState([]);
   const [movementsLoading, setMovementsLoading] = useState(false);
   const [showCreateStockItemForm, setShowCreateStockItemForm] = useState(false);
-  const [showCreateDeliveryForm, setShowCreateDeliveryForm] = useState(false);
-  const [showCreateSupplierForm, setShowCreateSupplierForm] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState(null);
   const [productionBatches, setProductionBatches] = useState([]);
   const [recipes, setRecipes] = useState([]);
   const [editingRecipe, setEditingRecipe] = useState(null);
@@ -73,7 +66,6 @@ function App() {
           dashboardData,
           stockItemsData,
           suppliersData,
-          deliveriesData,
           recipesData,
           productionBatchesData,
           prepTasksData,
@@ -90,7 +82,6 @@ function App() {
         setDashboard(dashboardData);
         setStockItems(stockItemsData);
         setSuppliers(suppliersData);
-        setDeliveries(deliveriesData);
         setRecipes(recipesData);
         setProductionBatches(productionBatchesData);
         setPrepTasks(prepTasksData);
@@ -140,14 +131,11 @@ function App() {
   const handleNavigate = (page) => {
     setActivePage(page);
     setSelectedStockItem(null);
-    setShowCreateDeliveryForm(false);
-    setShowCreateSupplierForm(false);
     setShowCreateRecipeForm(false);
     setShowCreateProductionBatchForm(false);
     setShowCreatePrepTaskForm(false);
     setEditingRecipe(null);
     setEditingStockItem(null);
-    setEditingSupplier(null)
     if (page !== "stock-items") {
       setShowCreateStockItemForm(false);
     }
@@ -163,21 +151,6 @@ function App() {
     const data = await apiFetch("/dashboard/summary");
     setDashboard(data);
   };
-
-  const refreshDeliveries = async () => {
-    const data = await apiFetch("/deliveries");
-    setDeliveries(data);
-  };
-
-  const refreshSuppliers = async () => {
-    const data = await apiFetch("/suppliers");
-    setSuppliers(data);
-  };
-
-  // const refreshPrepBatches = async () => {
-  //   const data = await apiFetch("/prep-batches");
-  //   setPrepBatches(data);
-  // };
 
   const refreshRecipes = async () => {
     const data = await apiFetch("/recipes");
@@ -234,97 +207,6 @@ function App() {
     setEditingStockItem(null);
   };
 
-  const handleCreateDelivery = async (formData) => {
-      const today = new Date().toLocaleDateString("en-CA");
-
-      const payload = {
-        supplier: formData.supplier,
-        deliveryDate: formData.deliveryDate === today ? undefined : formData.deliveryDate,
-        invoiceNumber: formData.invoiceNumber,
-        notes: formData.notes,
-        items: formData.items.map((line) => {
-          const selectedStockItem = stockItems.find(
-              (stockItem) => stockItem._id === line.stockItem
-          );
-
-          return {
-            stockItem: line.stockItem,
-            unit: selectedStockItem.stockUnit,
-            quantityReceived: Number(line.quantity),
-            quantityAccepted: line.hasProblem ? Number(line.quantityKept) : Number(line.quantity),
-            // Empty box = no price entered = null (not 0, which would mean "free").
-            unitCost: line.unitCost === "" ? null : Number(line.unitCost),
-            issueType: line.hasProblem ? line.issueType : "none",
-            issueNotes: line.hasProblem ? line.issueNotes : "",
-          };
-        }),
-      };
-
-      await apiFetch("/deliveries", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      await refreshDashboard();
-      await refreshStockItems();
-      await refreshDeliveries();
-
-      setShowCreateDeliveryForm(false);
-
-  };
-  const handleCreateSupplier = async (formData) => {
-    const payload = {
-      name: formData.name,
-      contactPerson: formData.contactPerson,
-      phone: formData.phone,
-      email: formData.email,
-      deliveryDays: formData.deliveryDays,
-      notes: formData.notes,
-      isActive: true,
-    };
-
-    await apiFetch("/suppliers", { method: "POST", body: JSON.stringify(payload) });
-    await refreshSuppliers();
-  };
-  const handleEditSupplierClick = (supplier) => {
-    setEditingSupplier(supplier);
-    setShowCreateSupplierForm(true);
-  };
-
-  const handleUpdateSupplier = async (supplierId, formData) => {
-    await apiFetch(`/suppliers/${supplierId}`, {
-      method: "PUT",
-      body: JSON.stringify(formData),
-    });
-
-    await refreshSuppliers();
-  };
-
-  const handleDeleteSupplier = async (supplier) => {
-    const confirmed = window.confirm(`Delete supplier "${supplier.name}"?`);
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await apiFetch(`/suppliers/${supplier._id}`, { method: "DELETE" });
-      await refreshSuppliers();
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleSubmitSupplier = async (formData) => {
-    if (editingSupplier) {
-      await handleUpdateSupplier(editingSupplier._id, formData);
-    } else {
-      await handleCreateSupplier(formData);
-    }
-
-    setShowCreateSupplierForm(false);
-    setEditingSupplier(null);
-  };
 
   const handleEditRecipeClick = (recipe) => {
     setEditingRecipe(recipe);
@@ -544,50 +426,11 @@ function App() {
                 </div>
             ))}
 
-        {activePage === "deliveries" && (
-            <div className="page-stack">
-              {showCreateDeliveryForm && (
-                  <CreateDeliveryForm
-                      suppliers={suppliers}
-                      stockItems={stockItems}
-                      onSubmit={handleCreateDelivery}
-                      onCancel={() => setShowCreateDeliveryForm(false)}
-                  />
-              )}
-              <DeliveriesView
-                  deliveries={deliveries}
-                  isFormOpen={showCreateDeliveryForm}
-                  onAddDelivery={() => setShowCreateDeliveryForm(true)}
-              />
-            </div>
-        )}
+        {activePage === "deliveries" && <DeliveriesPage />}
 
         {activePage === "suppliers" && <SuppliersPage />}
 
-        {activePage === "recipes" && (
-            <div className="page-stack">
-              {showCreateRecipeForm && (
-                  <CreateRecipeForm
-                      key={editingRecipe?._id ?? "new"}
-                      recipes={recipes}
-                      stockItems={stockItems}
-                      editingRecipe={editingRecipe}
-                      onSubmit={handleSubmitRecipe}
-                      onCancel={() => {
-                        setShowCreateRecipeForm(false);
-                        setEditingRecipe(null);
-                      }}
-                  />
-              )}
-              <RecipesView
-                  recipes={recipes}
-                  isFormOpen={showCreateRecipeForm}
-                  onAddRecipe={() => setShowCreateRecipeForm(true)}
-                  onEditRecipe={handleEditRecipeClick}
-                  onDeleteRecipe={handleDeleteRecipe}
-              />
-            </div>
-        )}
+        {activePage === "recipes" && <RecipesPage />}
 
         {activePage === "prep" &&
             (showCreatePrepTaskForm ? (

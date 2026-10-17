@@ -20,3 +20,7 @@ export function formatDate(date) {
 export function formatShortDate(date) {
     return new Date(date).toLocaleDateString("en-IE", { day: "numeric", month: "short" });
 }
+// The server sends a warning when something used more stock than the app
+// thinks you have. Turns them into one message, or "" if there are none.
+export const formatStockWarnings = (warnings) =>
+    warnings?.length ? warnings.map((warning) => warning.message).join("\n") : "";
