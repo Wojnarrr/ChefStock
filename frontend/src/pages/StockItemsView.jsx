@@ -1,6 +1,6 @@
 import {useAuth} from "../context/AuthContext.jsx";
 
-function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditStockItem, onDeleteStockItem }) {
+function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditStockItem, onDeleteStockItem, isFormOpen }) {
  const {role} = useAuth();
  const isOwner = role === 'owner';
   return (
@@ -13,11 +13,11 @@ function StockItemsView({ stockItems, onStockItemClick, onAddStockItem, onEditSt
 
           <div className="panel-actions">
             <span>{stockItems.length}</span>
-            {isOwner && (
-            <button className="primary-button" onClick={onAddStockItem}>
-              Add Stock Item
-            </button>
-            )}
+              {isOwner && !isFormOpen && (
+                  <button className="primary-button" onClick={onAddStockItem}>
+                      Add Stock Item
+                  </button>
+              )}
           </div>
         </div>
 

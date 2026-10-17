@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { STOCK_ADJUSTMENT_REASONS } from "../constants/options";
+import { useSubmit } from "../hooks/useSubmit";
 
 function AdjustStockForm({ item, onSubmit, onCancel }) {
     const [formData, setFormData] = useState({
@@ -13,17 +14,12 @@ function AdjustStockForm({ item, onSubmit, onCancel }) {
         setFormData((currentFormData) => ({ ...currentFormData, [name]: value }));
     };
 
+    const { submit, error, saving } = useSubmit(onSubmit);
+
     const handleSubmit = (event) => {
         event.preventDefault();
-
-        onSubmit({
-            stockItem: item._id,
-            newStock: Number(formData.newStock),
-            reason: formData.reason,
-            notes: formData.notes,
-        });
+        submit(formData);
     };
-
     return (
         <div className="inline-form-panel">
             <h3>Adjust Stock</h3>
@@ -67,6 +63,7 @@ function AdjustStockForm({ item, onSubmit, onCancel }) {
                         rows="2"
                     />
                 </label>
+                {error && <p className="error">{error}</p>}
 
                 <div className="form-actions">
                     <button type="button" className="secondary-button" onClick={onCancel}>

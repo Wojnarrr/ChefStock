@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import { useSubmit } from "../hooks/useSubmit";
 function CreatePrepBatchForm({ stockItems, onSubmit, onCancel }) {
   const createEmptyInputItem = () => ({
     stockItem: stockItems[0]?._id || "",
@@ -108,9 +108,11 @@ function CreatePrepBatchForm({ stockItems, onSubmit, onCancel }) {
     }));
   };
 
+  const { submit, error, saving } = useSubmit(onSubmit);
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSubmit(formData);
+    submit(formData);
   };
 
   return (
@@ -279,6 +281,7 @@ function CreatePrepBatchForm({ stockItems, onSubmit, onCancel }) {
             rows="3"
           />
         </label>
+        {error && <p className="error">{error}</p>}
 
         <div className="form-actions">
           <button type="button" className="secondary-button" onClick={onCancel}>

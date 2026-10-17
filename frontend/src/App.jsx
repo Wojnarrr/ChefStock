@@ -55,6 +55,7 @@ function App() {
   const [showAdjustStockForm, setShowAdjustStockForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
 
   // Reload everything whenever the selected restaurant changes, so switching
   // restaurant in the sidebar shows that restaurant's data straight away.
@@ -191,47 +192,11 @@ function App() {
     setPrepTasks(data);
   };
 
-  const handleCreateStockItem = async (formData) => {
-    try {
-      const payload = {
-        name: formData.name,
-        category: formData.category,
-        stockType: formData.stockType,
-        stockUnit: formData.stockUnit,
-        recipeUnit: formData.recipeUnit,
-        packType: formData.packType,
-        currentStock: Number(formData.currentStock),
-        minStockLevel: Number(formData.minStockLevel),
-        reorderQuantity: Number(formData.reorderQuantity),
-        trackingPriority: formData.trackingPriority,
-        requiresExpiryTracking: formData.requiresExpiryTracking,
-        requiresBatchTracking: formData.requiresBatchTracking,
-      };
 
-      if (formData.packType === "fixed") {
-        payload.unitsPerStockUnit = Number(formData.unitsPerStockUnit);
-      }
-
-      if (formData.packType === "variable") {
-        payload.estimatedUnitsPerStockUnit = Number(
-            formData.estimatedUnitsPerStockUnit
-        );
-      }
-
-      await apiFetch("/stock-items", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      await refreshStockItems();
-      setShowCreateStockItemForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
-  };
   const handleEditStockItemClick = (item) => {
     setEditingStockItem(item);
     setShowCreateStockItemForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDeleteStockItem = async (item) => {
@@ -270,29 +235,29 @@ function App() {
   };
 
   const handleCreateDelivery = async (formData) => {
-    try {
+      const today = new Date().toLocaleDateString("en-CA");
+
       const payload = {
         supplier: formData.supplier,
+        deliveryDate: formData.deliveryDate === today ? undefined : formData.deliveryDate,
         invoiceNumber: formData.invoiceNumber,
-        items: formData.items.map((deliveryItem) => {
+        notes: formData.notes,
+        items: formData.items.map((line) => {
           const selectedStockItem = stockItems.find(
-              (stockItem) => stockItem._id === deliveryItem.stockItem
+              (stockItem) => stockItem._id === line.stockItem
           );
 
           return {
-            stockItem: deliveryItem.stockItem,
-            quantityReceived: Number(deliveryItem.quantityReceived),
-            quantityAccepted: Number(deliveryItem.quantityAccepted),
+            stockItem: line.stockItem,
             unit: selectedStockItem.stockUnit,
+            quantityReceived: Number(line.quantity),
+            quantityAccepted: line.hasProblem ? Number(line.quantityKept) : Number(line.quantity),
             // Empty box = no price entered = null (not 0, which would mean "free").
-            unitCost: deliveryItem.unitCost === "" ? null : Number(deliveryItem.unitCost),
-            batchNumber: deliveryItem.batchNumber,
-            expiryDate: deliveryItem.expiryDate || null,
-            issueType: deliveryItem.issueType,
-            issueNotes: deliveryItem.issueNotes,
+            unitCost: line.unitCost === "" ? null : Number(line.unitCost),
+            issueType: line.hasProblem ? line.issueType : "none",
+            issueNotes: line.hasProblem ? line.issueNotes : "",
           };
         }),
-        notes: formData.notes,
       };
 
       await apiFetch("/deliveries", {
@@ -305,31 +270,21 @@ function App() {
       await refreshDeliveries();
 
       setShowCreateDeliveryForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
+
   };
   const handleCreateSupplier = async (formData) => {
-    try {
-      const payload = {
-        name: formData.name,
-        contactPerson: formData.contactPerson,
-        phone: formData.phone,
-        email: formData.email,
-        deliveryDays: formData.deliveryDays,
-        notes: formData.notes,
-        isActive: true,
-      };
-      await apiFetch("/suppliers", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+    const payload = {
+      name: formData.name,
+      contactPerson: formData.contactPerson,
+      phone: formData.phone,
+      email: formData.email,
+      deliveryDays: formData.deliveryDays,
+      notes: formData.notes,
+      isActive: true,
+    };
 
-      await refreshSuppliers();
-      setShowCreateSupplierForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
+    await apiFetch("/suppliers", { method: "POST", body: JSON.stringify(payload) });
+    await refreshSuppliers();
   };
   const handleEditSupplierClick = (supplier) => {
     setEditingSupplier(supplier);
@@ -361,67 +316,16 @@ function App() {
   };
 
   const handleSubmitSupplier = async (formData) => {
-    try {
-      if (editingSupplier) {
-        await handleUpdateSupplier(editingSupplier._id, formData);
-      } else {
-        await handleCreateSupplier(formData);
-        return; // handleCreateSupplier already closes the form itself
-      }
-
-      setShowCreateSupplierForm(false);
-      setEditingSupplier(null);
-    } catch (error) {
-      setError(error.message);
+    if (editingSupplier) {
+      await handleUpdateSupplier(editingSupplier._id, formData);
+    } else {
+      await handleCreateSupplier(formData);
     }
+
+    setShowCreateSupplierForm(false);
+    setEditingSupplier(null);
   };
-  const handleCreateRecipe = async (formData) => {
-    try {
-      const payload = {
-        name: formData.name,
-        recipeType: formData.recipeType,
-        outputUnit: formData.outputUnit,
-        portionsPerOutput:
-            formData.portionsPerOutput === ""
-                ? null
-                : Number(formData.portionsPerOutput),
-        ingredients: formData.ingredients.map((ingredient) => {
-          const selectedStockItem = stockItems.find(
-              (item) => item._id === ingredient.stockItem
-          );
 
-          return {
-            stockItem: ingredient.stockItem,
-            quantity: Number(ingredient.quantity),
-            unit: ingredient.unit || selectedStockItem.recipeUnit || selectedStockItem.stockUnit,
-            minQuantity:
-                ingredient.minQuantity === "" ? null : Number(ingredient.minQuantity),
-            maxQuantity:
-                ingredient.maxQuantity === "" ? null : Number(ingredient.maxQuantity),
-            isOptional: ingredient.isOptional,
-            notes: ingredient.notes,
-          };
-        }),
-        notes: formData.notes,
-        isActive: true,
-      };
-
-      if (formData.recipeType === "prep") {
-        payload.outputStockItem = formData.outputStockItem;
-        payload.outputQuantity = Number(formData.outputQuantity);
-      }
-
-      await apiFetch("/recipes", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      await refreshRecipes();
-      setShowCreateRecipeForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
-  };
   const handleEditRecipeClick = (recipe) => {
     setEditingRecipe(recipe);
     setShowCreateRecipeForm(true);
@@ -452,40 +356,33 @@ function App() {
   };
 
   const handleSubmitRecipe = async (formData) => {
-    try {
+      const isPrep = formData.recipeType === "prep";
+      const outputItem = stockItems.find((item) => item._id === formData.outputStockItem);
+
       const payload = {
         name: formData.name,
         recipeType: formData.recipeType,
-        outputUnit: formData.outputUnit,
+        // Prep output is added straight onto the item's stock, so it has to
+        // be in that item's stock unit.
+        outputUnit: isPrep ? outputItem.stockUnit : formData.outputUnit,
         portionsPerOutput:
-            formData.portionsPerOutput === ""
-                ? null
-                : Number(formData.portionsPerOutput),
+            !isPrep && formData.portionsPerOutput !== "" ? Number(formData.portionsPerOutput) : null,
+        outputStockItem: isPrep ? formData.outputStockItem : null,
+        outputQuantity: isPrep ? Number(formData.outputQuantity) : null,
         ingredients: formData.ingredients.map((ingredient) => {
-          const selectedStockItem = stockItems.find(
-              (item) => item._id === ingredient.stockItem
-          );
+          const stockItem = stockItems.find((item) => item._id === ingredient.stockItem);
 
           return {
             stockItem: ingredient.stockItem,
             quantity: Number(ingredient.quantity),
-            unit: ingredient.unit || selectedStockItem.recipeUnit || selectedStockItem.stockUnit,
-            minQuantity:
-                ingredient.minQuantity === "" ? null : Number(ingredient.minQuantity),
-            maxQuantity:
-                ingredient.maxQuantity === "" ? null : Number(ingredient.maxQuantity),
+            // Always the item's own recipe unit: that's what the backend converts from.
+            unit: stockItem.recipeUnit || stockItem.stockUnit,
             isOptional: ingredient.isOptional,
-            notes: ingredient.notes,
           };
         }),
         notes: formData.notes,
         isActive: true,
       };
-
-      if (formData.recipeType === "prep") {
-        payload.outputStockItem = formData.outputStockItem;
-        payload.outputQuantity = Number(formData.outputQuantity);
-      }
 
       if (editingRecipe) {
         await handleUpdateRecipe(editingRecipe._id, payload);
@@ -499,12 +396,9 @@ function App() {
 
       setShowCreateRecipeForm(false);
       setEditingRecipe(null);
-    } catch (error) {
-      setError(error.message);
-    }
+
   };
   const handleCreateProductionBatch = async (formData) => {
-    try {
       const payload = {
         itemsProduced: formData.itemsProduced.map((item) => ({
           recipe: item.recipe,
@@ -529,12 +423,9 @@ function App() {
       await refreshProductionBatches();
 
       setShowCreateProductionBatchForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
+
   };
   const handleCreatePrepTask = async (formData) => {
-    try {
       await apiFetch("/prep-tasks", {
         method: "POST",
         body: JSON.stringify(formData),
@@ -542,9 +433,6 @@ function App() {
 
       await refreshPrepTasks();
       setShowCreatePrepTaskForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
   };
   const handleCompleteTask = async (taskId) => {
     try {
@@ -565,26 +453,21 @@ function App() {
     }
   };
   const handleCreateStockAdjustment = async (payload) => {
-    try {
+
       await apiFetch("/stock-adjustments", {
         method: "POST",
         body: JSON.stringify(payload),
       });
 
       await refreshDashboard();
-      const updatedStockItems = await refreshStockItems();
 
+      const updatedStockItems = await refreshStockItems();
       const updatedItem = updatedStockItems.find(
           (stockItem) => stockItem._id === payload.stockItem
       );
       setSelectedStockItem(updatedItem);
-
       await loadItemMovements(payload.stockItem);
-
       setShowAdjustStockForm(false);
-    } catch (error) {
-      setError(error.message);
-    }
   };
 
   const page = getPage(activePage);
@@ -634,40 +517,50 @@ function App() {
                     onCancelAdjust={() => setShowAdjustStockForm(false)}
                     onSubmitAdjustment={handleCreateStockAdjustment}
                 />
-            ) : showCreateStockItemForm ? (
-                <CreateStockItemForm
-                    editingStockItem={editingStockItem}
-                    suppliers={suppliers}
-                    onSubmit={handleSubmitStockItem}
-                    onCancel={() => {
-                      setShowCreateStockItemForm(false);
-                      setEditingStockItem(null);
-                    }}
-                />
             ) : (
-                <StockItemsView
-                    stockItems={stockItems}
-                    onStockItemClick={handleStockItemClick}
-                    onAddStockItem={() => setShowCreateStockItemForm(true)}
-                    onEditStockItem={handleEditStockItemClick}
-                    onDeleteStockItem={handleDeleteStockItem}
-                />
+                <div className="page-stack">
+                  {showCreateStockItemForm && (
+                      <CreateStockItemForm
+                          key={editingStockItem?._id ?? "new"}
+                          editingStockItem={editingStockItem}
+                          stockItems={stockItems}
+                          suppliers={suppliers}
+                          onSubmit={handleSubmitStockItem}
+                          onCancel={() => {
+                            setShowCreateStockItemForm(false);
+                            setEditingStockItem(null);
+                          }}
+                      />
+                  )}
+
+                  <StockItemsView
+                      stockItems={stockItems}
+                      isFormOpen={showCreateStockItemForm}
+                      onStockItemClick={handleStockItemClick}
+                      onAddStockItem={() => setShowCreateStockItemForm(true)}
+                      onEditStockItem={handleEditStockItemClick}
+                      onDeleteStockItem={handleDeleteStockItem}
+                  />
+                </div>
             ))}
 
-        {activePage === "deliveries" &&
-          (showCreateDeliveryForm ? (
-            <CreateDeliveryForm
-              suppliers={suppliers}
-              stockItems={stockItems}
-              onSubmit={handleCreateDelivery}
-              onCancel={() => setShowCreateDeliveryForm(false)}
-            />
-          ) : (
-            <DeliveriesView
-              deliveries={deliveries}
-              onAddDelivery={() => setShowCreateDeliveryForm(true)}
-            />
-          ))}
+        {activePage === "deliveries" && (
+            <div className="page-stack">
+              {showCreateDeliveryForm && (
+                  <CreateDeliveryForm
+                      suppliers={suppliers}
+                      stockItems={stockItems}
+                      onSubmit={handleCreateDelivery}
+                      onCancel={() => setShowCreateDeliveryForm(false)}
+                  />
+              )}
+              <DeliveriesView
+                  deliveries={deliveries}
+                  isFormOpen={showCreateDeliveryForm}
+                  onAddDelivery={() => setShowCreateDeliveryForm(true)}
+              />
+            </div>
+        )}
 
         {activePage === "suppliers" &&
             (showCreateSupplierForm ? (
@@ -688,26 +581,30 @@ function App() {
                 />
             ))}
 
-        {activePage === "recipes" &&
-            (showCreateRecipeForm ? (
-                <CreateRecipeForm
-                    recipes={recipes}
-                    stockItems={stockItems}
-                    editingRecipe={editingRecipe}
-                    onSubmit={handleSubmitRecipe}
-                    onCancel={() => {
-                      setShowCreateRecipeForm(false);
-                      setEditingRecipe(null);
-                    }}
-                />
-            ) : (
-                <RecipesView
-                    recipes={recipes}
-                    onAddRecipe={() => setShowCreateRecipeForm(true)}
-                    onEditRecipe={handleEditRecipeClick}
-                    onDeleteRecipe={handleDeleteRecipe}
-                />
-            ))}
+        {activePage === "recipes" && (
+            <div className="page-stack">
+              {showCreateRecipeForm && (
+                  <CreateRecipeForm
+                      key={editingRecipe?._id ?? "new"}
+                      recipes={recipes}
+                      stockItems={stockItems}
+                      editingRecipe={editingRecipe}
+                      onSubmit={handleSubmitRecipe}
+                      onCancel={() => {
+                        setShowCreateRecipeForm(false);
+                        setEditingRecipe(null);
+                      }}
+                  />
+              )}
+              <RecipesView
+                  recipes={recipes}
+                  isFormOpen={showCreateRecipeForm}
+                  onAddRecipe={() => setShowCreateRecipeForm(true)}
+                  onEditRecipe={handleEditRecipeClick}
+                  onDeleteRecipe={handleDeleteRecipe}
+              />
+            </div>
+        )}
 
         {activePage === "prep" &&
             (showCreatePrepTaskForm ? (
@@ -753,7 +650,14 @@ function App() {
       {page && (
         <PageHeader eyebrow={page.section} title={page.title} subtitle={page.subtitle} />
       )}
-
+      {actionError && (
+          <div className="alert" role="alert">
+            <span>{actionError}</span>
+            <button type="button" className="link-button" onClick={() => setActionError("")}>
+              Dismiss
+            </button>
+          </div>
+      )}
       {renderPageContent()}
     </AppLayout>
   );

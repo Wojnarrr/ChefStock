@@ -1,80 +1,100 @@
 import { useState } from "react";
 import { formatEuro } from "../utils/format";
-// Cost of one line on the invoice. You pay for what you accepted, not what
-// arrived (rejected items get credited). Returns null if no price was entered.
-const getLineTotal = (item) => {
-  if (item.unitCost === "") return null;
-  return Number(item.unitCost) * Number(item.quantityAccepted || 0);
+import { useSubmit } from "../hooks/useSubmit";
+// Today as "YYYY-MM-DD" in the user's own timezone (toISOString would use UTC,
+// which gives yesterday's date just after midnight in Ireland).
+const getToday = () => new Date().toLocaleDateString("en-CA");
+const { submit, error, saving } = useSubmit(onSubmit);
+
+const ISSUE_OPTIONS = [
+  { value: "damaged", label: "Damaged" },
+  { value: "missing", label: "Missing / short" },
+  { value: "wrong_item", label: "Wrong item" },
+  { value: "rejected", label: "Rejected (quality)" },
+];
+
+const createEmptyLine = () => ({
+  stockItem: "",
+  quantity: "1",
+  unitCost: "",
+  hasProblem: false,
+  quantityKept: "",
+  issueType: "damaged",
+  issueNotes: "",
+});
+
+// What you keep is what you pay for. With no problem, you keep everything.
+const getKeptQuantity = (line) =>
+    line.hasProblem ? Number(line.quantityKept || 0) : Number(line.quantity || 0);
+
+// Returns null if no price was entered (not 0, which would mean "free").
+const getLineTotal = (line) => {
+  if (line.unitCost === "") return null;
+  return Number(line.unitCost) * getKeptQuantity(line);
 };
 
 function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
-  const createEmptyDeliveryItem = () => ({
-    stockItem: stockItems[0]?._id || "",
-    quantityReceived: "1",
-    quantityAccepted: "1",
-    batchNumber: "",
-    expiryDate: "",
-    issueType: "none",
-    issueNotes: "",
-    unitCost: "",
-  });
-
   const [formData, setFormData] = useState({
-    supplier: suppliers[0]?._id || "",
+    supplier: "",
+    deliveryDate: getToday(),
     invoiceNumber: "",
     notes: "",
-    items: [createEmptyDeliveryItem()],
+    items: [createEmptyLine()],
   });
+
+  const findStockItem = (id) => stockItems.find((item) => item._id === id);
+
+  // Items this supplier usually brings go at the top of the dropdown.
+  const fromThisSupplier = stockItems.filter(
+      (item) => formData.supplier && item.preferredSupplier?._id === formData.supplier
+  );
+  const otherItems = stockItems.filter((item) => !fromThisSupplier.includes(item));
 
   const handleMainChange = (event) => {
     const { name, value } = event.target;
-
-    setFormData((currentFormData) => ({
-      ...currentFormData,
-      [name]: value,
-    }));
+    setFormData((current) => ({ ...current, [name]: value }));
   };
 
-  const handleItemChange = (index, event) => {
-    const { name, value } = event.target;
+  // Updates one field on one line. Picking an item also fills in the
+  // last price paid, so most of the time you don't need to type it.
+  const updateLine = (index, changes) => {
+    setFormData((current) => ({
+      ...current,
+      items: current.items.map((line, lineIndex) => {
+        if (lineIndex !== index) return line;
 
-    setFormData((currentFormData) => {
-      const updatedItems = currentFormData.items.map((item, itemIndex) => {
-        if (itemIndex !== index) {
-          return item;
+        const next = { ...line, ...changes };
+
+        if ("stockItem" in changes) {
+          const lastCost = findStockItem(changes.stockItem)?.lastUnitCost;
+          next.unitCost = lastCost != null ? String(lastCost) : "";
         }
 
-        return {
-          ...item,
-          [name]: value,
-        };
-      });
+        // Opening the problem section starts "kept" at the full amount,
+        // so you only change it if something was short or sent back.
+        if (changes.hasProblem && line.quantityKept === "") {
+          next.quantityKept = line.quantity;
+        }
 
-      return {
-        ...currentFormData,
-        items: updatedItems,
-      };
-    });
-  };
-
-  const handleAddItem = () => {
-    setFormData((currentFormData) => ({
-      ...currentFormData,
-      items: [...currentFormData.items, createEmptyDeliveryItem()],
+        return next;
+      }),
     }));
   };
 
-  const handleRemoveItem = (index) => {
-    setFormData((currentFormData) => {
-      if (currentFormData.items.length === 1) {
-        return currentFormData;
-      }
+  const handleLineChange = (index, event) => {
+    const { name, value, type, checked } = event.target;
+    updateLine(index, { [name]: type === "checkbox" ? checked : value });
+  };
 
-      return {
-        ...currentFormData,
-        items: currentFormData.items.filter((_, itemIndex) => itemIndex !== index),
-      };
-    });
+  const handleAddLine = () => {
+    setFormData((current) => ({ ...current, items: [...current.items, createEmptyLine()] }));
+  };
+
+  const handleRemoveLine = (index) => {
+    setFormData((current) => ({
+      ...current,
+      items: current.items.filter((_, lineIndex) => lineIndex !== index),
+    }));
   };
 
   const lineTotals = formData.items.map(getLineTotal).filter((total) => total !== null);
@@ -82,227 +102,241 @@ function CreateDeliveryForm({ suppliers, stockItems, onSubmit, onCancel }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSubmit(formData);
+    submit(formData);
   };
 
+  const renderOption = (item) => (
+      <option key={item._id} value={item._id}>
+        {item.name} ({item.stockUnit})
+      </option>
+  );
+
   return (
-    <section className="panel form-panel">
-      <div className="panel-header">
-        <div>
-          <h2>Add Delivery</h2>
-          <p className="panel-subtitle">
-            Record one supplier delivery with multiple stock items.
-          </p>
-        </div>
-      </div>
-      {suppliers.length === 0 && (
-        <p className="error">
-          No suppliers found. Create a supplier first before recording deliveries.
-        </p>
-      )}
-      <form className="stock-form" onSubmit={handleSubmit}>
-        <div className="form-grid">
-          <label>
-            Supplier
-            <select
-              name="supplier"
-              value={formData.supplier}
-              onChange={handleMainChange}
-              required
-            >
-              {suppliers.map((supplier) => (
-                <option key={supplier._id} value={supplier._id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Invoice Number
-            <input
-              name="invoiceNumber"
-              value={formData.invoiceNumber}
-              onChange={handleMainChange}
-              placeholder="e.g. INV-123"
-            />
-          </label>
-        </div>
-
-        <div className="delivery-items-header">
+      <section className="panel form-panel">
+        <div className="panel-header">
           <div>
-            <h3>Delivery Items</h3>
-            <p className="panel-subtitle">Add each item from the supplier invoice.</p>
+            <h2>Add delivery</h2>
+            <p className="panel-subtitle">Go down the invoice and add each line.</p>
+          </div>
+        </div>
+
+        {suppliers.length === 0 && (
+            <p className="error">No suppliers yet. Add a supplier before recording deliveries.</p>
+        )}
+
+        <form className="stock-form" onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <label>
+              Supplier
+              <select name="supplier" value={formData.supplier} onChange={handleMainChange} required>
+                <option value="" disabled>
+                  Choose supplier…
+                </option>
+                {suppliers.map((supplier) => (
+                    <option key={supplier._id} value={supplier._id}>
+                      {supplier.name}
+                    </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Delivered on
+              <input
+                  name="deliveryDate"
+                  type="date"
+                  max={getToday()}
+                  value={formData.deliveryDate}
+                  onChange={handleMainChange}
+                  required
+              />
+            </label>
           </div>
 
-          <button type="button" className="primary-button" onClick={handleAddItem}>
-            Add Item
-          </button>
-        </div>
+          <div className="delivery-lines">
+            {formData.items.map((line, index) => {
+              const selected = findStockItem(line.stockItem);
+              const unit = selected?.stockUnit || "units";
+              const lineTotal = getLineTotal(line);
 
-        <div className="delivery-items-list">
-          {formData.items.map((deliveryItem, index) => {
-            const selectedStockItem = stockItems.find(
-              (item) => item._id === deliveryItem.stockItem
-            );
+              return (
+                  <div className="delivery-line" key={index}>
+                    <div className="delivery-line-grid">
+                      <label>
+                        Item
+                        <select
+                            name="stockItem"
+                            value={line.stockItem}
+                            onChange={(event) => handleLineChange(index, event)}
+                            required
+                        >
+                          <option value="" disabled>
+                            Choose item…
+                          </option>
+                          {fromThisSupplier.length > 0 ? (
+                              <>
+                                <optgroup label="Usually from this supplier">
+                                  {fromThisSupplier.map(renderOption)}
+                                </optgroup>
+                                <optgroup label="Everything else">{otherItems.map(renderOption)}</optgroup>
+                              </>
+                          ) : (
+                              stockItems.map(renderOption)
+                          )}
+                        </select>
+                      </label>
 
-            return (
-              <div className="delivery-item-card" key={index}>
-                <div className="delivery-item-card-header">
-                  <h4>Item {index + 1}</h4>
+                      <label>
+                        Quantity
+                        <span className="input-with-unit">
+                      <input
+                          name="quantity"
+                          type="number"
+                          step="any"
+                          min="0.001"
+                          value={line.quantity}
+                          onChange={(event) => handleLineChange(index, event)}
+                          required
+                      />
+                      <span>{unit}</span>
+                    </span>
+                      </label>
 
-                  {formData.items.length > 1 && (
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => handleRemoveItem(index)}
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
+                      <label>
+                        € per {unit} (ex VAT)
+                        <input
+                            name="unitCost"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={line.unitCost}
+                            onChange={(event) => handleLineChange(index, event)}
+                            placeholder="Optional"
+                        />
+                        {lineTotal !== null && (
+                            <span className="field-hint">Line total: {formatEuro(lineTotal)}</span>
+                        )}
+                      </label>
 
-                <div className="form-grid">
-                  <label>
-                    Stock Item
-                    <select
-                      name="stockItem"
-                      value={deliveryItem.stockItem}
-                      onChange={(event) => handleItemChange(index, event)}
-                      required
-                    >
-                      {stockItems.map((item) => (
-                        <option key={item._id} value={item._id}>
-                          {item.name} ({item.stockUnit})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      {formData.items.length > 1 && (
+                          <button
+                              type="button"
+                              className="link-button danger delivery-line-remove"
+                              onClick={() => handleRemoveLine(index)}
+                              aria-label={`Remove line ${index + 1}`}
+                          >
+                            Remove
+                          </button>
+                      )}
+                    </div>
 
-                  <label>
-                    Unit
-                    <input value={selectedStockItem?.stockUnit || ""} disabled readOnly />
-                  </label>
+                    <label className="checkbox-label">
+                      <input
+                          type="checkbox"
+                          name="hasProblem"
+                          checked={line.hasProblem}
+                          onChange={(event) => handleLineChange(index, event)}
+                      />
+                      Problem with this item
+                    </label>
 
-                  <label>
-                    Quantity Received
-                    <input
-                      name="quantityReceived"
-                      type="number"
-                      step="0.001"
-                      value={deliveryItem.quantityReceived}
-                      onChange={(event) => handleItemChange(index, event)}
-                      required
-                    />
-                  </label>
+                    {line.hasProblem && (
+                        <div className="delivery-line-grid delivery-problem">
+                          <label>
+                            What happened?
+                            <select
+                                name="issueType"
+                                value={line.issueType}
+                                onChange={(event) => handleLineChange(index, event)}
+                            >
+                              {ISSUE_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                              ))}
+                            </select>
+                          </label>
 
-                  <label>
-                    Quantity Accepted
-                    <input
-                      name="quantityAccepted"
-                      type="number"
-                      step="0.001"
-                      value={deliveryItem.quantityAccepted}
-                      onChange={(event) => handleItemChange(index, event)}
-                      required
-                    />
-                  </label>
-
-                  <label>
-                    Cost per {selectedStockItem?.stockUnit || "unit"} (€, ex VAT)
-                    <input
-                        name="unitCost"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={deliveryItem.unitCost}
-                        onChange={(event) => handleItemChange(index, event)}
-                        placeholder="Optional"
-                    />
-                    {getLineTotal(deliveryItem) !== null && (
-                        <span className="field-hint">
-                        Line total: {formatEuro(getLineTotal(deliveryItem))}
+                          <label>
+                            How many did you keep?
+                            <span className="input-with-unit">
+                        <input
+                            name="quantityKept"
+                            type="number"
+                            step="any"
+                            min="0"
+                            max={line.quantity}
+                            value={line.quantityKept}
+                            onChange={(event) => handleLineChange(index, event)}
+                            required
+                        />
+                        <span>{unit}</span>
                       </span>
+                          </label>
+
+                          <label>
+                            Note
+                            <input
+                                name="issueNotes"
+                                value={line.issueNotes}
+                                onChange={(event) => handleLineChange(index, event)}
+                                placeholder="e.g. 2 cans dented"
+                            />
+                          </label>
+                        </div>
                     )}
-                  </label>
+                  </div>
+              );
+            })}
+          </div>
 
-                  <label>
-                    Batch Number
-                    <input
-                      name="batchNumber"
-                      value={deliveryItem.batchNumber}
-                      onChange={(event) => handleItemChange(index, event)}
-                      placeholder="Optional"
-                    />
-                  </label>
-
-                  <label>
-                    Expiry Date
-                    <input
-                      name="expiryDate"
-                      type="date"
-                      value={deliveryItem.expiryDate}
-                      onChange={(event) => handleItemChange(index, event)}
-                    />
-                  </label>
-
-                  <label>
-                    Issue Type
-                    <select
-                      name="issueType"
-                      value={deliveryItem.issueType}
-                      onChange={(event) => handleItemChange(index, event)}
-                    >
-                      <option value="none">None</option>
-                      <option value="missing">Missing</option>
-                      <option value="extra">Extra</option>
-                      <option value="damaged">Damaged</option>
-                      <option value="wrong_item">Wrong Item</option>
-                      <option value="wrong_quantity">Wrong Quantity</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </label>
-
-                  <label>
-                    Issue Notes
-                    <input
-                      name="issueNotes"
-                      value={deliveryItem.issueNotes}
-                      onChange={(event) => handleItemChange(index, event)}
-                      placeholder="Optional"
-                    />
-                  </label>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {lineTotals.length > 0 && (
-            <p className="delivery-total">
-              Delivery total (ex VAT): <strong>{formatEuro(deliveryTotal)}</strong>
-            </p>
-        )}
-        <label className="full-width-label">
-          Delivery Notes
-          <textarea
-            name="notes"
-            value={formData.notes}
-            onChange={handleMainChange}
-            placeholder="Optional delivery notes"
-            rows="3"
-          />
-        </label>
-
-        <div className="form-actions">
-          <button type="button" className="secondary-button" onClick={onCancel}>
-            Cancel
+          <button type="button" className="secondary-button" onClick={handleAddLine}>
+            + Add another item
           </button>
-          <button type="submit" className="primary-button">
-            Create Delivery
-          </button>
-        </div>
-      </form>
-    </section>
+
+          {lineTotals.length > 0 && (
+              <p className="delivery-total">
+                Delivery total (ex VAT): <strong>{formatEuro(deliveryTotal)}</strong>
+              </p>
+          )}
+
+          <details className="more-options">
+            <summary>Invoice number and notes</summary>
+            <div className="form-grid">
+              <label>
+                Invoice number
+                <input
+                    name="invoiceNumber"
+                    value={formData.invoiceNumber}
+                    onChange={handleMainChange}
+                    placeholder="e.g. INV-123"
+                />
+              </label>
+
+              <label>
+                Notes
+                <input
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleMainChange}
+                    placeholder="e.g. Driver was late"
+                />
+              </label>
+            </div>
+          </details>
+
+          {error && <p className="error">{error}</p>}
+
+          <div className="form-actions">
+            <button type="button" className="secondary-button" onClick={onCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="primary-button" disabled={saving}>
+              {saving ? "Saving..." : "Save delivery"}
+            </button>
+          </div>
+        </form>
+      </section>
   );
 }
 

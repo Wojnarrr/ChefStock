@@ -37,7 +37,7 @@ const toFormState = (item) =>
           preferredSupplier: "",
         };
 
-function CreateStockItemForm({ editingStockItem, suppliers = [], onSubmit, onCancel }) {
+function CreateStockItemForm({ editingStockItem, stockItems = [], suppliers = [], onSubmit, onCancel }) {
   const isEditing = Boolean(editingStockItem);
 
   const [form, setForm] = useState(() => toFormState(editingStockItem));
@@ -46,7 +46,17 @@ function CreateStockItemForm({ editingStockItem, suppliers = [], onSubmit, onCan
 
   // Only ask for the conversion when the two units are different.
   const needsConversion = form.stockUnit !== form.recipeUnit;
-
+// Items whose name contains what's been typed, so you can spot duplicates.
+  const typed = form.name.trim().toLowerCase();
+  const similarItems =
+      typed.length >= 2
+          ? stockItems.filter(
+              (item) =>
+                  item._id !== editingStockItem?._id &&
+                  item.name.toLowerCase().includes(typed)
+          )
+          : [];
+  const exactMatch = similarItems.find((item) => item.name.toLowerCase() === typed);
   const handleChange = (event) => {
     const { name, value } = event.target;
     setError("");
@@ -118,6 +128,16 @@ function CreateStockItemForm({ editingStockItem, suppliers = [], onSubmit, onCan
             <label>
               Name
               <input name="name" value={form.name} onChange={handleChange} placeholder="e.g. Mozzarella" required />
+              {exactMatch ? (
+                  <span className="field-hint field-warning">
+                    "{exactMatch.name}" is already in your stock list.
+                  </span>
+              ) : similarItems.length > 0 && (
+                  <span className="field-hint">
+                    Already have: {similarItems.slice(0, 4).map((item) => item.name).join(", ")}
+                    {similarItems.length > 4 && ` +${similarItems.length - 4} more`}
+                  </span>
+              )}
             </label>
 
             <label>

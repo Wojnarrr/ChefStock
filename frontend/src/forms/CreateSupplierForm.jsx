@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DELIVERY_DAY_OPTIONS } from "../constants/options";
-
+import { useSubmit } from "../hooks/useSubmit";
 function CreateSupplierForm({ editingSupplier, onSubmit, onCancel }) {
   const isEditing = Boolean(editingSupplier);
 
@@ -44,11 +44,12 @@ function CreateSupplierForm({ editingSupplier, onSubmit, onCancel }) {
     });
   };
 
+  const { submit, error, saving } = useSubmit(onSubmit);
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSubmit(formData);
+    submit(formData);
   };
-
   return (
     <section className="panel form-panel">
       <div className="panel-header">
@@ -136,6 +137,7 @@ function CreateSupplierForm({ editingSupplier, onSubmit, onCancel }) {
           />
         </label>
 
+        {error && <p className="error">{error}</p>}
         <div className="form-actions">
           <button type="button" className="secondary-button" onClick={onCancel}>
             Cancel

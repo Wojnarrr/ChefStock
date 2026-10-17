@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import { useSubmit } from "../hooks/useSubmit";
 function CreatePrepTaskForm({ recipes, onSubmit, onCancel }) {
     const prepRecipes = recipes.filter(
         (recipe) => recipe.recipeType === "prep" && recipe.isActive
@@ -30,19 +30,11 @@ function CreatePrepTaskForm({ recipes, onSubmit, onCancel }) {
         });
     };
 
+    const { submit, error, saving } = useSubmit(onSubmit);
+
     const handleSubmit = (event) => {
         event.preventDefault();
-
-        onSubmit({
-            taskName: formData.taskName,
-            linkedRecipe: formData.linkedRecipe || null,
-            targetQuantity: formData.linkedRecipe
-                ? Number(formData.targetQuantity)
-                : null,
-            assignedTo: formData.assignedTo,
-            dueTime: formData.dueTime,
-            notes: formData.notes,
-        });
+        submit(formData);
     };
 
     const selectedRecipe = prepRecipes.find(
@@ -135,6 +127,7 @@ function CreatePrepTaskForm({ recipes, onSubmit, onCancel }) {
                         rows="3"
                     />
                 </label>
+                {error && <p className="error">{error}</p>}
 
                 <div className="form-actions">
                     <button type="button" className="secondary-button" onClick={onCancel}>

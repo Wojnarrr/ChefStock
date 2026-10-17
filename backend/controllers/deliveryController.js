@@ -60,10 +60,9 @@ const createDelivery = async (req, res) => {
         }
 
         const createdDeliveries = await DeliveryRecord.create(
-            [{ ...req.body, restaurant: req.restaurantId }],
+            [{ ...req.body, restaurant: req.restaurantId, receivedBy: req.user._id }],
             { session }
         );
-
         const delivery = createdDeliveries[0];
 
         const movementRecords = [];
