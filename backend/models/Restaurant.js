@@ -36,12 +36,23 @@ const restaurantSchema = new mongoose.Schema(
             max: [100, "VAT rate can't be over 100%"],
         },
 
-        // The food cost % the owner aims for; menu items above it are flagged.
         targetFoodCostPercent: {
             type: Number,
             default: 30,
             min: [1, "Target must be at least 1%"],
             max: [100, "Target can't be over 100%"],
+        },
+        // The Flipdish store this restaurant's sales come from
+        // (Flipdish's StoreId, called physicalRestaurantId in the orders API).
+        flipdishStoreId: {
+            type: Number,
+            default: null,
+        },
+
+        // When orders were last pulled, so the next sync only asks for new ones.
+        flipdishLastSyncAt: {
+            type: Date,
+            default: null,
         },
         isActive: {
             type: Boolean,

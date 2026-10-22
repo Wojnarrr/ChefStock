@@ -165,13 +165,9 @@ function MenuView() {
                             <thead>
                             <tr>
                                 <th>Item</th>
-                                <td><MadeFrom item={item} /></td>
-                                <td className="number">
-                                    {formatEuro(item.sellPrice)}
-                                    {item.vatRate !== null && item.vatRate !== undefined && (
-                                        <span className="cell-subtext">{item.vatRate}% VAT</span>
-                                    )}
-                                </td>                                <th className="number">Cost</th>
+                                <th>Made from</th>
+                                <th className="number">Price</th>
+                                <th className="number">Cost</th>
                                 <th className="number">Profit</th>
                                 <th className="number">Food cost</th>
                                 <th>Status</th>
@@ -189,12 +185,13 @@ function MenuView() {
                                             <strong>{item.name}</strong>
                                             {item.category && <span className="cell-subtext">{item.category}</span>}
                                         </td>
-                                        <td>
-                                            {item.portions}
-                                            {item.recipe?.portionsPerOutput ? ` of ${item.recipe.portionsPerOutput}` : ""}
-                                            <span className="cell-subtext">{item.recipe?.name || "Recipe removed"}</span>
+                                        <td><MadeFrom item={item} /></td>
+                                        <td className="number">
+                                            {formatEuro(item.sellPrice)}
+                                            {item.vatRate !== null && item.vatRate !== undefined && (
+                                                <span className="cell-subtext">{item.vatRate}% VAT</span>
+                                            )}
                                         </td>
-                                        <td className="number">{formatEuro(item.sellPrice)}</td>
                                         <td className="number">{formatEuro(costing.cost)}</td>
                                         <td className="number">{formatEuro(costing.grossProfit)}</td>
                                         <td className="number">

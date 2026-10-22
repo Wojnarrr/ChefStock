@@ -17,6 +17,8 @@ const authRoutes = require("./routes/auth");
 const memberRoutes = require("./routes/members");
 const restaurantRoutes = require("./routes/restaurants");
 const menuItemRoutes = require("./routes/menuItems");
+const flipdishRoutes = require("./routes/flipdish");
+
 dotenv.config();
 
 const app = express();
@@ -37,6 +39,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/menu-items", menuItemRoutes);
+app.use("/api/flipdish", flipdishRoutes);
 
 app.get("/", (req, res) => {
     res.send("ChefStock API is running");

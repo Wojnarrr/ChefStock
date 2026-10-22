@@ -1,6 +1,5 @@
 import { useTableControls } from "../hooks/useTableControls";
 import { TableControls, Pagination } from "../components/TableControls";
-import { formatDate } from "../utils/format";
 import { Fragment, useState } from "react";
 import { formatDate, formatEuro } from "../utils/format";
 
