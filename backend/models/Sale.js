@@ -5,10 +5,11 @@ const mongoose = require("mongoose");
 const saleLineSchema = new mongoose.Schema(
     {
         // How this line is matched to a ChefStock menu item: the Flipdish item id,
-        // plus the size option id if the item has sizes (e.g. "4521:9932").
+        // plus the size option id if the item has sizes (e.g. "<item id>:<size id>").
         flipdishKey: { type: String, required: true },
         name: { type: String, required: true }, // e.g. "Margherita - Half tray"
-        price: { type: Number, required: true, min: 0 }, // incl. VAT, incl. options
+        price: { type: Number, required: true, min: 0 }, // ONE unit, incl. VAT, incl. options
+        quantity: { type: Number, default: 1, min: 0 }, // the old orders API had no quantity, so 1
         menuItem: { type: mongoose.Schema.Types.ObjectId, ref: "MenuItem", default: null }, // null = not matched yet
     },
     { _id: false }
@@ -17,8 +18,10 @@ const saleLineSchema = new mongoose.Schema(
 const saleSchema = new mongoose.Schema(
     {
         restaurant: { type: mongoose.Schema.Types.ObjectId, ref: "Restaurant", required: true },
-        source: { type: String, enum: ["flipdish"], default: "flipdish" },
-        externalOrderId: { type: String, required: true }, // Flipdish OrderId
+        // "flipdish-sales": the newer Sales API (till + online). "flipdish": the old orders API.
+        source: { type: String, enum: ["flipdish", "flipdish-sales"], default: "flipdish-sales" },
+        externalOrderId: { type: String, required: true }, // Flipdish saleId (or OrderId)
+        channel: { type: String, default: "" }, // e.g. "POS", "Web", "UberEats"
         placedAt: { type: Date, required: true },
         orderState: { type: String, required: true }, // Flipdish's OrderState, as-is
         // Did the customer actually get (and pay for) this order?

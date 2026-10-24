@@ -48,7 +48,16 @@ const restaurantSchema = new mongoose.Schema(
             type: Number,
             default: null,
         },
+// The newer Sales API addresses a shop as org + property, e.g. "org123" / "p456".
+        flipdishOrgId: {
+            type: String,
+            default: null,
+        },
 
+        flipdishPropertyId: {
+            type: String,
+            default: null,
+        },
         // When orders were last pulled, so the next sync only asks for new ones.
         flipdishLastSyncAt: {
             type: Date,

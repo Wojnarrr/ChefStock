@@ -21,7 +21,11 @@ const getAccessToken = async () => {
 
     const response = await fetch(`${BASE_URL}/identity/connect/token`, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": USER_AGENT },
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": USER_AGENT,
+            Accept: "application/json",
+        },
         body: new URLSearchParams({
             grant_type: "client_credentials",
             client_id: process.env.FLIPDISH_CLIENT_ID,
@@ -31,7 +35,26 @@ const getAccessToken = async () => {
     });
 
     if (!response.ok) {
-        throw new Error(`Flipdish login failed (${response.status}). Check the client id and secret in backend/.env.`);
+        // OAuth servers explain a 400 in the body, e.g. { error: "invalid_client" }.
+        const body = await response.text();
+        let reason = body.slice(0, 200);
+        try {
+            const data = JSON.parse(body);
+            reason = [data.error, data.error_description].filter(Boolean).join(": ") || reason;
+        } catch {
+            // Not JSON: keep the raw text.
+        }
+
+        // Clues for the server console. Lengths only: never log the secret itself.
+        const id = process.env.FLIPDISH_CLIENT_ID;
+        const secret = process.env.FLIPDISH_CLIENT_SECRET;
+        console.warn(
+            `Flipdish login failed (${response.status}: ${reason}). ` +
+                `Client id is ${id.length} characters, secret is ${secret.length}. ` +
+                `Spaces or quotes inside: ${/[\s"']/.test(id + secret) ? "YES" : "no"}.`
+        );
+
+        throw new Error(`Flipdish login failed (${response.status}: ${reason || "no reason given"})`);
     }
 
     const data = await response.json();
@@ -39,7 +62,9 @@ const getAccessToken = async () => {
     return cachedToken.value;
 };
 
-const flipdishGet = async (path, params = {}) => {
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const flipdishGet = async (path, params = {}, attempt = 1) => {
     const token = await getAccessToken();
     const url = new URL(path, BASE_URL);
 
@@ -49,16 +74,32 @@ const flipdishGet = async (path, params = {}) => {
     }
 
     const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}`, "User-Agent": USER_AGENT },
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "User-Agent": USER_AGENT,
+            // Without this, Flipdish answers in XML.
+            Accept: "application/json",
+        },
     });
 
-    if (response.status === 429) throw new Error("Flipdish rate limit hit, try again in a minute.");
+    // Too many requests: wait as long as Flipdish asks (or 5 s), then try again, up to 3 times.
+    if (response.status === 429) {
+        if (attempt >= 3) throw new Error("Flipdish rate limit hit, try again in a minute.");
+        const seconds = Number(response.headers?.get?.("retry-after")) || 5;
+        await wait(seconds * 1000);
+        return flipdishGet(path, params, attempt + 1);
+    }
     if (response.status === 401 || response.status === 403) {
         throw new Error(`Flipdish said no (${response.status}). This login may not have access to that store.`);
     }
     if (!response.ok) throw new Error(`Flipdish request failed (${response.status}) for ${url.pathname}`);
 
-    return response.json();
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error(`Flipdish sent something that isn't JSON for ${url.pathname}: ${text.slice(0, 80)}`);
+    }
 };
 
 // The stores this login can see, so the owner can pick theirs.
@@ -102,4 +143,71 @@ const getRecentOrders = async ({ storeId, days = 7, limit = 20 }) => {
     return result.Data;
 };
 
-module.exports = { isConfigured, getStores, getOrders, getRecentOrders };
+// The organisations this login belongs to. The newer Sales API is organised
+// as org -> property (your shop) -> sales channels (POS, website, app...).
+const getOrgs = async () => {
+    const result = await flipdishGet("/orgManagement/orgs");
+    const raw = result.data || result.Data || [];
+
+    const orgs = raw
+        .map((org) => ({
+            // The docs aren't consistent about the name of this field, so accept several.
+            id: org.orgId ?? org.id ?? org.OrgId ?? org.Id,
+            name: org.name ?? org.Name ?? "",
+        }))
+        .filter((org) => org.id);
+
+    // Got orgs back but couldn't find their id: say which fields there were (names only).
+    if (raw.length > 0 && orgs.length === 0) {
+        throw new Error(`Couldn't find the org id. Fields Flipdish sent: ${Object.keys(raw[0]).join(", ")}`);
+    }
+
+    return orgs;
+};
+
+// Sales from EVERY channel at one property (till, website, app, kiosk...),
+// newest first. Uses a "cursor" instead of page numbers: each page tells you
+// where the next one starts. Flipdish marks this API as beta.
+const getPropertySales = async ({ orgId, propertyId, after, before, pageSize = 50, cursor }) => {
+    const path = `/sales/orgs/${encodeURIComponent(orgId)}/properties/${encodeURIComponent(propertyId)}/sales`;
+    const params = { pageSize };
+    if (after) params.after = after.toISOString();
+    if (before) params.before = before.toISOString();
+    if (cursor) params.cursor = cursor;
+    return flipdishGet(path, params); // { data, hasMoreRecords, nextCursor }
+};
+
+// The same, for the whole organisation (every property). Only needs the org id,
+// and every sale says which property it belongs to.
+const getOrgSales = async ({ orgId, after, before, pageSize = 50, cursor }) => {
+    const params = { pageSize };
+    if (after) params.after = after.toISOString();
+    if (before) params.before = before.toISOString();
+    if (cursor) params.cursor = cursor;
+    return flipdishGet(`/sales/orgs/${encodeURIComponent(orgId)}/sales`, params);
+};
+
+// Every sale at one property since `after`, following the cursor page by page.
+const getAllPropertySales = async ({ orgId, propertyId, after }) => {
+    const sales = [];
+    let cursor;
+
+    do {
+        const page = await getPropertySales({ orgId, propertyId, after, pageSize: 200, cursor });
+        sales.push(...(page.data || []));
+        cursor = page.hasMoreRecords ? page.nextCursor : null;
+    } while (cursor);
+
+    return sales;
+};
+
+module.exports = {
+    isConfigured,
+    getStores,
+    getOrders,
+    getRecentOrders,
+    getOrgs,
+    getPropertySales,
+    getOrgSales,
+    getAllPropertySales,
+};

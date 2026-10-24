@@ -1,6 +1,6 @@
 // Turns Flipdish orders into ChefStock Sales. Pure functions + one save, so the
 // mapping can be tested with fake orders, no API needed.
-const Sale = require("../../../backend/models/Sale");
+const Sale = require("../models/Sale");
 const MenuItem = require("../models/MenuItem");
 
 // Orders the customer actually received. Rejected, cancelled, refunded,
@@ -89,4 +89,129 @@ const importOrders = async (orders, restaurantId, storeId) => {
     return { created: result.upsertedCount, updated: result.modifiedCount };
 };
 
-module.exports = { importOrders, orderToSale, describeOrder, getFlipdishKey, COUNTED_STATES };
+// The same kind of customer-free view, for a sale from the newer Sales API.
+// Modifiers can contain modifiers (e.g. size -> extra topping), so this is recursive.
+const describeModifiers = (modifiers = []) =>
+    modifiers.map((modifier) => ({
+        id: modifier.modifierItemId,
+        name: modifier.modifierItemName,
+        quantity: modifier.quantity,
+        unitPrice: modifier.unitPrice,
+        modifiers: describeModifiers(modifier.modifierItems),
+    }));
+
+const describeSale = (entry) => ({
+    saleId: entry.saleId,
+    channel: entry.salesChannelType, // e.g. "POS", "KIOSK", "UberEats"
+    source: entry.source ?? entry.sale?.source ?? "",
+    status: entry.sale?.status,
+    createdAt: entry.createdAt,
+    total: entry.sale?.totalSaleAmount,
+    items: (entry.sale?.items || []).map((item) => ({
+        menuItemId: item.menuItemId,
+        name: item.menuItemName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        modifiers: describeModifiers(item.modifierItems),
+    })),
+});
+
+// ---------------------------------------------------------------------------
+// The newer Sales API (till + online)
+// ---------------------------------------------------------------------------
+
+// Sales the customer actually got. Pending, rejected, cancelled and fully
+// refunded sales are saved but don't count.
+const COUNTED_SALE_STATUSES = [
+    "SALE_ACCEPTED",
+    "SALE_PREPARED_BY_KITCHEN",
+    "SALE_DISPATCHED",
+    "SALE_ON_THE_WAY",
+    "SALE_DELIVERED",
+    "SALE_PARTIALLY_REFUNDED",
+];
+
+// The Sales API doesn't mark which option is the size, so we recognise it by
+// name. Your online menu uses "Half Tray"; add words here if your menu uses others.
+const SIZE_WORDS = /\b(slice|half|full|tray|whole|small|medium|large|regular)\b/i;
+
+const findSize = (item) => (item.modifierItems || []).find((modifier) => SIZE_WORDS.test(modifier.modifierItemName || ""));
+
+const getSaleItemKey = (item) => {
+    const size = findSize(item);
+    return size ? `${item.menuItemId}:${size.modifierItemId}` : item.menuItemId;
+};
+
+// What one unit costs, including every option (and the options' options).
+const unitPriceWithModifiers = (item) =>
+    (item.unitPrice || 0) +
+    (item.modifierItems || []).reduce(
+        (sum, modifier) => sum + unitPriceWithModifiers(modifier) * (modifier.quantity || 1),
+        0
+    );
+
+const saleToRecord = (entry, restaurantId, menuItemIdsByKey) => {
+    const sale = entry.sale || {};
+
+    return {
+        restaurant: restaurantId,
+        source: "flipdish-sales",
+        externalOrderId: entry.saleId,
+        channel: entry.salesChannelType || "",
+        placedAt: new Date(sale.creationTime || entry.createdAt),
+        orderState: sale.status || "UNKNOWN",
+        counts: COUNTED_SALE_STATUSES.includes(sale.status),
+        amount: sale.totalSaleAmount ?? 0,
+        totalTax: sale.totalTax ?? 0,
+        lines: (sale.items || []).map((item) => {
+            const flipdishKey = getSaleItemKey(item);
+            const size = findSize(item);
+            return {
+                flipdishKey,
+                name: size ? `${item.menuItemName} - ${size.modifierItemName}` : item.menuItemName || "Unnamed item",
+                price: Math.round(unitPriceWithModifiers(item) * 100) / 100,
+                quantity: item.quantity || 1,
+                menuItem: menuItemIdsByKey.get(flipdishKey) ?? null,
+            };
+        }),
+    };
+};
+
+const importSales = async (entries, restaurantId, propertyId) => {
+    // Same safety net as for orders: only this shop's sales.
+    entries = entries.filter((entry) => !entry.propertyId || entry.propertyId === propertyId);
+
+    const menuItems = await MenuItem.find({ restaurant: restaurantId, isActive: true, flipdishItemId: { $ne: "" } });
+    const menuItemIdsByKey = new Map(menuItems.map((item) => [item.flipdishItemId, item._id]));
+
+    const records = entries.map((entry) => saleToRecord(entry, restaurantId, menuItemIdsByKey));
+    if (records.length === 0) return { created: 0, updated: 0, byChannel: {} };
+
+    const result = await Sale.bulkWrite(
+        records.map((record) => ({
+            updateOne: {
+                filter: { restaurant: restaurantId, source: "flipdish-sales", externalOrderId: record.externalOrderId },
+                update: { $set: record },
+                upsert: true,
+            },
+        }))
+    );
+
+    const byChannel = {};
+    for (const record of records) byChannel[record.channel || "unknown"] = (byChannel[record.channel || "unknown"] || 0) + 1;
+
+    return { created: result.upsertedCount, updated: result.modifiedCount, byChannel };
+};
+
+module.exports = {
+    importOrders,
+    importSales,
+    orderToSale,
+    saleToRecord,
+    describeOrder,
+    describeSale,
+    getFlipdishKey,
+    getSaleItemKey,
+    COUNTED_STATES,
+    COUNTED_SALE_STATUSES,
+};
